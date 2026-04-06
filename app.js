@@ -6,7 +6,7 @@ import {
   collection, doc, getDoc, getDocs,
   setDoc, updateDoc, deleteDoc, onSnapshot,
   query, orderBy
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+} from "./firebase.js";
 
 // ═══════════════════════════════════════════
 // STATE
