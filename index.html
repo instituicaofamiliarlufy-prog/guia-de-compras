@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guia de Compras v5.2</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-icon">🛒</span>
+        <div class="brand-text">
+          <h1>Guia de Compras</h1>
+          <span class="brand-version">v5.2</span>
+        </div>
+      </div>
+      <nav class="main-nav">
+        <button class="nav-btn active" data-view="lista">
+          <span class="nav-icon">📋</span>
+          <span>Lista</span>
+        </button>
+        <button class="nav-btn" data-view="gerar">
+          <span class="nav-icon">✨</span>
+          <span>Gerar</span>
+        </button>
+        <button class="nav-btn" data-view="admin">
+          <span class="nav-icon">⚙️</span>
+          <span>Admin</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="app-main">
+
+    <!-- ─────────────────────────────────────────
+         VIEW: LISTA
+    ───────────────────────────────────────── -->
+    <section id="view-lista" class="view active">
+      <div class="view-header">
+        <h2>Lista de Compras</h2>
+        <p class="view-subtitle">Acompanhe os seus produtos em tempo real</p>
+      </div>
+
+      <div class="lista-controls">
+        <div class="date-picker-wrap">
+          <label for="lista-date">📅 Data</label>
+          <input type="date" id="lista-date" />
+        </div>
+        <div class="sort-wrap">
+          <label for="lista-sort">Ordenar por</label>
+          <select id="lista-sort">
+            <option value="categoria">Categoria (A-Z)</option>
+            <option value="supermercado">Supermercado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Calendar strip -->
+      <div class="calendar-strip-wrap">
+        <div id="calendar-strip" class="calendar-strip"></div>
+      </div>
+
+      <div id="lista-empty" class="empty-state hidden">
+        <div class="empty-icon">🗒️</div>
+        <p>Nenhuma lista para esta data.</p>
+        <small>Selecione outra data ou gere uma nova lista.</small>
+      </div>
+
+      <div id="lista-loading" class="loading-state">
+        <div class="spinner"></div>
+        <span>A carregar lista…</span>
+      </div>
+
+      <div id="lista-content" class="lista-content hidden"></div>
+
+      <div id="lista-summary" class="lista-summary hidden">
+        <span id="summary-checked">0</span> / <span id="summary-total">0</span> itens marcados
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────
+         VIEW: GERAR
+    ───────────────────────────────────────── -->
+    <section id="view-gerar" class="view hidden">
+      <div class="view-header">
+        <h2>Gerar Nova Lista</h2>
+        <p class="view-subtitle">Selecione os produtos para a sua lista</p>
+      </div>
+
+      <div class="gerar-controls">
+        <div class="date-picker-wrap">
+          <label for="gerar-date">📅 Data da lista</label>
+          <input type="date" id="gerar-date" />
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="gerar-search" placeholder="Pesquisar produto…" />
+        </div>
+        <select id="gerar-cat-filter">
+          <option value="">Todas as categorias</option>
+        </select>
+        <label class="select-all-label">
+          <input type="checkbox" id="gerar-select-all" />
+          Seleccionar tudo
+        </label>
+      </div>
+
+      <div id="gerar-catalog" class="gerar-catalog"></div>
+
+      <div class="gerar-footer">
+        <span id="gerar-count" class="gerar-count">0 produtos seleccionados</span>
+        <button id="btn-create-list" class="btn-primary" disabled>
+          <span>Criar Lista</span>
+          <span class="btn-arrow">→</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────
+         VIEW: ADMIN
+    ───────────────────────────────────────── -->
+    <section id="view-admin" class="view hidden">
+      <div class="view-header">
+        <h2>Administração do Catálogo</h2>
+        <p class="view-subtitle">Gerir categorias e produtos</p>
+      </div>
+
+      <div class="admin-toolbar">
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="admin-search" placeholder="Pesquisar produto…" />
+          </div>
+          <select id="admin-cat-filter">
+            <option value="">Todas as categorias</option>
+          </select>
+        </div>
+        <div class="admin-actions">
+          <button id="btn-seed" class="btn-secondary">
+            🌱 Seed Padrão
+          </button>
+          <button id="btn-add-category" class="btn-primary">
+            + Nova Categoria
+          </button>
+        </div>
+      </div>
+
+      <div id="admin-catalog" class="admin-catalog"></div>
+    </section>
+
+  </main>
+
+  <!-- ─────────────────────────────────────────
+       MODALS
+  ───────────────────────────────────────── -->
+
+  <!-- Modal: Add/Edit Category -->
+  <div id="modal-category" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-cat-title">Nova Categoria</h3>
+        <button class="modal-close" data-modal="modal-category">✕</button>
+      </div>
+      <div class="modal-body">
+        <label>Nome da Categoria</label>
+        <input type="text" id="cat-name-input" placeholder="Ex: Frutas e Legumes" />
+        <input type="hidden" id="cat-id-input" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-modal="modal-category">Cancelar</button>
+        <button id="btn-save-category" class="btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Item -->
+  <div id="modal-item" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-item-title">Novo Produto</h3>
+        <button class="modal-close" data-modal="modal-item">✕</button>
+      </div>
+      <div class="modal-body">
+        <label>Nome do Produto</label>
+        <input type="text" id="item-name-input" placeholder="Ex: Maçã" />
+        <label>Quantidade Padrão</label>
+        <input type="number" id="item-qty-input" placeholder="1" min="0" step="0.1" />
+        <label>Unidade</label>
+        <select id="item-unit-input">
+          <option value="un">un (unidades)</option>
+          <option value="kg">kg (quilograma)</option>
+          <option value="g">g (grama)</option>
+          <option value="L">L (litro)</option>
+          <option value="ml">ml (mililitro)</option>
+          <option value="cx">cx (caixa)</option>
+          <option value="pack">pack</option>
+          <option value="dz">dz (dúzia)</option>
+        </select>
+        <label>Categoria</label>
+        <select id="item-cat-input"></select>
+        <input type="hidden" id="item-id-input" />
+        <input type="hidden" id="item-original-cat-input" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-modal="modal-item">Cancelar</button>
+        <button id="btn-save-item" class="btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirm Delete -->
+  <div id="modal-confirm" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Confirmar eliminação</h3>
+        <button class="modal-close" data-modal="modal-confirm">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message">Tem a certeza que deseja eliminar este item?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-modal="modal-confirm">Cancelar</button>
+        <button id="btn-confirm-delete" class="btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
