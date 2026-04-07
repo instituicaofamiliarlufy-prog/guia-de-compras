@@ -1,830 +1,663 @@
-// app.js — Guia de Compras v5.2
-// ─────────────────────────────────────────────
+// app.js — Guia de Compras v5.3
 import { db } from "./firebase.js";
 import { defaultCatalog } from "./data-default.js";
 import {
   collection, doc, getDoc, getDocs,
-  setDoc, updateDoc, deleteDoc, onSnapshot,
-  query, orderBy
+  setDoc, updateDoc, deleteDoc, onSnapshot
 } from "./firebase.js";
 
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
 const state = {
-  catalog: {},           // { catId: { nome, items: [] } }
-  listaDates: new Set(), // set of "YYYY-MM-DD" strings that have lists
-  currentLista: null,    // { date, items: {} }
-  currentListaDate: null,
-  unsubLista: null,      // firestore listener cleanup
-  pendingDelete: null,   // { type: 'category'|'item', catId, itemIndex }
+  catalog:        {},
+  allListas:      [],
+  currentLista:   null,
+  currentListaId: null,
+  unsubLista:     null,
+  pendingDelete:  null,
 };
 
 // ═══════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
+function todayStr() { return new Date().toISOString().split("T")[0]; }
+function formatDatePT(s) { if (!s) return ""; const [y,m,d]=s.split("-"); return `${d}/${m}/${y}`; }
+function slugify(t) {
+  return t.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 }
-
-function formatDatePT(dateStr) {
-  if (!dateStr) return "";
-  const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function slugify(text) {
-  return text.trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-function generateItemId(catId, name) {
-  return `${catId}_${slugify(name)}`;
-}
-
-function showToast(msg, type = "default") {
+function generateItemId(catId, name) { return `${catId}_${slugify(name)}`; }
+function showToast(msg, type="default") {
   const t = document.getElementById("toast");
   t.textContent = msg;
   t.className = `toast show ${type}`;
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.className = "toast"; }, 3000);
+  t._timer = setTimeout(() => { t.className = "toast"; }, 3200);
 }
+function openModal(id)  { document.getElementById(id).classList.remove("hidden"); }
+function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
 
-function openModal(id) {
-  document.getElementById(id).classList.remove("hidden");
-}
-function closeModal(id) {
-  document.getElementById(id).classList.add("hidden");
+function getShopsFromCatalog() {
+  const shops = new Set();
+  Object.values(state.catalog).forEach(cat =>
+    (cat.items||[]).forEach(it => { if (it.bestShop) shops.add(it.bestShop); })
+  );
+  return [...shops].sort();
 }
 
 // ═══════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════
-const views = { lista: "view-lista", gerar: "view-gerar", admin: "view-admin" };
+const views = { listas:"view-listas", lista:"view-lista", gerar:"view-gerar", admin:"view-admin" };
 
-function switchView(name) {
+function switchView(name, param) {
+  if (state.unsubLista) { state.unsubLista(); state.unsubLista = null; }
   Object.values(views).forEach(id => {
     document.getElementById(id).classList.add("hidden");
     document.getElementById(id).classList.remove("active");
   });
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-
-  const el = document.getElementById(views[name]);
-  el.classList.remove("hidden");
-  el.classList.add("active");
-  document.querySelector(`[data-view="${name}"]`).classList.add("active");
-
-  if (name === "lista") initListaView();
-  if (name === "gerar") initGerarView();
-  if (name === "admin") initAdminView();
+  document.getElementById(views[name]).classList.remove("hidden");
+  document.getElementById(views[name]).classList.add("active");
+  const nb = document.querySelector(`[data-view="${name}"]`);
+  if (nb) nb.classList.add("active");
+  if (name==="listas") initListasView();
+  if (name==="lista")  initListaView(param);
+  if (name==="gerar")  initGerarView();
+  if (name==="admin")  initAdminView();
 }
 
+document.getElementById("brand-link").addEventListener("click", () => switchView("listas"));
 document.querySelectorAll(".nav-btn").forEach(btn => {
-  btn.addEventListener("click", () => switchView(btn.dataset.view));
+  btn.addEventListener("click", () => {
+    const v = btn.dataset.view;
+    if (v==="lista") switchView("listas");
+    else switchView(v);
+  });
 });
 
 // ═══════════════════════════════════════════
 // FIRESTORE — CATALOG
 // ═══════════════════════════════════════════
 async function loadCatalog() {
-  const snap = await getDocs(collection(db, "catalogo"));
+  const snap = await getDocs(collection(db,"catalogo"));
   state.catalog = {};
   snap.forEach(d => { state.catalog[d.id] = d.data(); });
-  return state.catalog;
 }
-
-async function saveCategoryToFirestore(catId, data) {
-  await setDoc(doc(db, "catalogo", catId), data);
-}
-
-async function deleteCategoryFromFirestore(catId) {
-  await deleteDoc(doc(db, "catalogo", catId));
-}
+async function saveCategoryToFirestore(catId, data) { await setDoc(doc(db,"catalogo",catId), data); }
+async function deleteCategoryFromFirestore(catId)   { await deleteDoc(doc(db,"catalogo",catId)); }
 
 // ═══════════════════════════════════════════
-// FIRESTORE — LISTS
+// FIRESTORE — LISTAS (UUID doc ids)
 // ═══════════════════════════════════════════
-async function loadListaDates() {
-  const snap = await getDocs(collection(db, "listas"));
-  state.listaDates = new Set();
-  snap.forEach(d => state.listaDates.add(d.id));
+async function loadAllListas() {
+  const snap = await getDocs(collection(db,"listas"));
+  state.allListas = [];
+  snap.forEach(d => {
+    const data = d.data();
+    state.allListas.push({
+      id:           d.id,
+      date:         data.date||"",
+      nome:         data.nome||"",
+      supermercado: data.supermercado||"",
+      itemCount:    data.items ? Object.keys(data.items).length : 0,
+    });
+  });
+  state.allListas.sort((a,b) => b.date.localeCompare(a.date));
 }
-
-async function getListaDoc(dateStr) {
-  const snap = await getDoc(doc(db, "listas", dateStr));
-  return snap.exists() ? snap.data() : null;
+async function getListaById(id) {
+  const snap = await getDoc(doc(db,"listas",id));
+  return snap.exists() ? {id:snap.id,...snap.data()} : null;
 }
-
-async function getMostRecentLista() {
-  // Sort dates descending, pick first
-  const sorted = [...state.listaDates].sort().reverse();
-  if (!sorted.length) return null;
-  return { date: sorted[0], ...(await getListaDoc(sorted[0])) };
-}
-
-function subscribeToLista(dateStr, callback) {
-  if (state.unsubLista) { state.unsubLista(); state.unsubLista = null; }
-  state.unsubLista = onSnapshot(doc(db, "listas", dateStr), snap => {
-    if (snap.exists()) callback(snap.data());
-    else callback(null);
+function subscribeToLista(id, cb) {
+  if (state.unsubLista) { state.unsubLista(); state.unsubLista=null; }
+  state.unsubLista = onSnapshot(doc(db,"listas",id), snap => {
+    cb(snap.exists() ? {id:snap.id,...snap.data()} : null);
   });
 }
-
-async function updateListaItem(dateStr, itemId, fields) {
-  const ref = doc(db, "listas", dateStr);
-  const update = {};
-  Object.entries(fields).forEach(([k, v]) => { update[`items.${itemId}.${k}`] = v; });
-  await updateDoc(ref, update);
+async function updateListaItem(listaId, itemId, fields) {
+  const upd = {};
+  Object.entries(fields).forEach(([k,v]) => { upd[`items.${itemId}.${k}`]=v; });
+  await updateDoc(doc(db,"listas",listaId), upd);
 }
-
-async function saveNewLista(dateStr, items) {
-  await setDoc(doc(db, "listas", dateStr), { date: dateStr, items });
+async function saveNewLista(listaDoc) {
+  const id = crypto.randomUUID();
+  await setDoc(doc(db,"listas",id), listaDoc);
+  return id;
 }
+async function deleteListaById(id) { await deleteDoc(doc(db,"listas",id)); }
 
 // ═══════════════════════════════════════════
 // SEED
 // ═══════════════════════════════════════════
 async function seedCatalog() {
   const btn = document.getElementById("btn-seed");
-  btn.disabled = true;
-  btn.textContent = "A carregar…";
+  btn.disabled=true; btn.textContent="A carregar…";
   try {
-    for (const [catName, items] of Object.entries(defaultCatalog)) {
-      const catId = slugify(catName);
-      await saveCategoryToFirestore(catId, { nome: catName, items });
+    for (const [catName,items] of Object.entries(defaultCatalog)) {
+      await saveCategoryToFirestore(slugify(catName), {nome:catName,items});
     }
-    await loadCatalog();
-    renderAdminCatalog();
-    populateCategorySelects();
-    showToast("Catálogo carregado com sucesso!", "success");
-  } catch (e) {
-    console.error(e);
-    showToast("Erro ao carregar catálogo.", "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "🌱 Seed Padrão";
-  }
+    await loadCatalog(); renderAdminCatalog(); populateCategorySelects();
+    showToast("Catálogo carregado!","success");
+  } catch(e) { console.error(e); showToast("Erro ao carregar catálogo.","error"); }
+  finally { btn.disabled=false; btn.textContent="🌱 Seed Padrão"; }
 }
 
 // ═══════════════════════════════════════════
-// SHARED: POPULATE CATEGORY SELECTS
+// SHARED SELECTS
 // ═══════════════════════════════════════════
 function populateCategorySelects() {
-  const cats = Object.entries(state.catalog)
-    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
-
-  // Admin filter
-  const adminFilter = document.getElementById("admin-cat-filter");
-  const adminVal = adminFilter.value;
-  adminFilter.innerHTML = '<option value="">Todas as categorias</option>' +
-    cats.map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join("");
-  adminFilter.value = adminVal;
-
-  // Gerar filter
-  const gerarFilter = document.getElementById("gerar-cat-filter");
-  const gerarVal = gerarFilter.value;
-  gerarFilter.innerHTML = '<option value="">Todas as categorias</option>' +
-    cats.map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join("");
-  gerarFilter.value = gerarVal;
-
-  // Item modal category select
-  const itemCatSel = document.getElementById("item-cat-input");
-  itemCatSel.innerHTML = cats.map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join("");
+  const cats = Object.entries(state.catalog).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
+  ["admin-cat-filter","gerar-cat-filter"].forEach(id => {
+    const sel=document.getElementById(id), val=sel.value;
+    sel.innerHTML='<option value="">Todas as categorias</option>'+
+      cats.map(([id,c])=>`<option value="${id}">${c.nome}</option>`).join("");
+    sel.value=val;
+  });
+  document.getElementById("item-cat-input").innerHTML =
+    cats.map(([id,c])=>`<option value="${id}">${c.nome}</option>`).join("");
 }
+function populateShopFilter(selId) {
+  const sel=document.getElementById(selId); if(!sel) return;
+  const val=sel.value, shops=getShopsFromCatalog();
+  sel.innerHTML='<option value="">Todos os supermercados</option>'+
+    shops.map(s=>`<option value="${s}">${s}</option>`).join("");
+  sel.value=val;
+}
+
+// ═══════════════════════════════════════════
+// VIEW: LISTAGEM DE LISTAS
+// ═══════════════════════════════════════════
+async function initListasView() {
+  await loadAllListas();
+  renderListasGrid();
+}
+
+function renderListasGrid() {
+  const container = document.getElementById("listas-grid");
+  container.innerHTML = "";
+  if (!state.allListas.length) {
+    container.innerHTML=`<div class="empty-state"><div class="empty-icon">🗒️</div>
+      <p>Nenhuma lista criada ainda.</p><small>Use "Gerar" para criar a sua primeira lista.</small></div>`;
+    return;
+  }
+  const byDate = {};
+  state.allListas.forEach(l => { if(!byDate[l.date]) byDate[l.date]=[]; byDate[l.date].push(l); });
+  Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([date,listas]) => {
+    const group = document.createElement("div");
+    group.className="listas-date-group";
+    group.innerHTML=`<div class="listas-date-label">📅 ${formatDatePT(date)}</div>`;
+    listas.forEach(lista => {
+      const card=document.createElement("div");
+      card.className="lista-card";
+      card.innerHTML=`
+        <div class="lista-card-body" data-id="${lista.id}">
+          <div class="lista-card-top">
+            <span class="lista-card-nome">${lista.nome||"Lista sem nome"}</span>
+            ${lista.supermercado?`<span class="lista-card-shop">🛍️ ${lista.supermercado}`:""}
+          </div>
+          <div class="lista-card-meta">${lista.itemCount} produtos</div>
+        </div>
+        <div class="lista-card-actions">
+          <button class="btn-icon" title="Partilhar link" data-action="share" data-id="${lista.id}">🔗</button>
+          <button class="btn-icon" title="Editar" data-action="edit-lista" data-id="${lista.id}">✏️</button>
+          <button class="btn-icon danger" title="Apagar" data-action="delete-lista" data-id="${lista.id}">🗑️</button>
+        </div>`;
+      card.querySelector(".lista-card-body").addEventListener("click", () => switchView("lista", lista.id));
+      card.querySelectorAll("[data-action]").forEach(btn => {
+        btn.addEventListener("click", e => {
+          e.stopPropagation();
+          handleListaCardAction(btn.dataset.action, btn.dataset.id);
+        });
+      });
+      group.appendChild(card);
+    });
+    container.appendChild(group);
+  });
+}
+
+function shareUrl(listaId) {
+  const base = location.href.replace(/index\.html.*$/, "").replace(/\?.*$/, "");
+  return `${base}viewer.html?lista=${listaId}`;
+}
+
+function handleListaCardAction(action, listaId) {
+  if (action==="share") {
+    const url = shareUrl(listaId);
+    navigator.clipboard.writeText(url).then(()=>showToast("Link copiado!","success"))
+      .catch(()=>prompt("Copia este link:", url));
+  }
+  if (action==="edit-lista")   openEditListaModal(listaId);
+  if (action==="delete-lista") confirmDeleteLista(listaId);
+}
+
+async function openEditListaModal(listaId) {
+  const lista = state.allListas.find(l=>l.id===listaId); if(!lista) return;
+  document.getElementById("edit-lista-id").value   = listaId;
+  document.getElementById("edit-lista-nome").value = lista.nome||"";
+  document.getElementById("edit-lista-date").value = lista.date||"";
+  document.getElementById("edit-lista-shop").value = lista.supermercado||"";
+  openModal("modal-edit-lista");
+}
+document.getElementById("btn-save-edit-lista").addEventListener("click", async () => {
+  const id   = document.getElementById("edit-lista-id").value;
+  const nome = document.getElementById("edit-lista-nome").value.trim();
+  const date = document.getElementById("edit-lista-date").value;
+  const shop = document.getElementById("edit-lista-shop").value.trim();
+  if (!nome) return showToast("Insira um nome.","error");
+  if (!date) return showToast("Seleccione uma data.","error");
+  try {
+    await updateDoc(doc(db,"listas",id),{nome,date,supermercado:shop});
+    closeModal("modal-edit-lista");
+    showToast("Lista actualizada!","success");
+    await loadAllListas(); renderListasGrid();
+  } catch(e) { console.error(e); showToast("Erro ao actualizar.","error"); }
+});
+
+function confirmDeleteLista(listaId) {
+  const lista = state.allListas.find(l=>l.id===listaId);
+  state.pendingDelete = {type:"lista",id:listaId};
+  document.getElementById("confirm-message").textContent =
+    `Apagar a lista "${lista?.nome||formatDatePT(lista?.date)}"? Esta acção não pode ser desfeita.`;
+  openModal("modal-confirm");
+}
+
+// ═══════════════════════════════════════════
+// VIEW: LISTA (detalhe)
+// ═══════════════════════════════════════════
+async function initListaView(listaId) {
+  if (!listaId) { switchView("listas"); return; }
+  state.currentListaId = listaId;
+  document.getElementById("lista-loading").classList.remove("hidden");
+  document.getElementById("lista-empty").classList.add("hidden");
+  document.getElementById("lista-content").classList.add("hidden");
+  document.getElementById("lista-summary").classList.add("hidden");
+  document.getElementById("lista-search").value="";
+  document.getElementById("lista-shop-filter").value="";
+
+  await loadCatalog();
+  populateShopFilter("lista-shop-filter");
+
+  subscribeToLista(listaId, listaData => {
+    document.getElementById("lista-loading").classList.add("hidden");
+    if (!listaData) { document.getElementById("lista-empty").classList.remove("hidden"); return; }
+    state.currentLista = listaData;
+    document.getElementById("lista-view-title").textContent = listaData.nome || formatDatePT(listaData.date);
+    document.getElementById("lista-view-date").textContent  = formatDatePT(listaData.date);
+    document.getElementById("lista-view-shop").textContent  = listaData.supermercado ? `🛍️ ${listaData.supermercado}` : "";
+    renderLista(listaData);
+  });
+}
+
+function getListaFilters() {
+  return {
+    search: document.getElementById("lista-search").value.toLowerCase().trim(),
+    shop:   document.getElementById("lista-shop-filter").value,
+    sort:   document.getElementById("lista-sort").value,
+  };
+}
+
+function renderLista(listaData) {
+  const {search,shop,sort} = getListaFilters();
+  const container = document.getElementById("lista-content");
+  container.innerHTML="";
+  if (!listaData?.items||!Object.keys(listaData.items).length) {
+    document.getElementById("lista-empty").classList.remove("hidden");
+    container.classList.add("hidden"); return;
+  }
+  document.getElementById("lista-empty").classList.add("hidden");
+  container.classList.remove("hidden");
+  document.getElementById("lista-summary").classList.remove("hidden");
+
+  let entries = Object.entries(listaData.items).filter(([,item]) =>
+    (!search||item.name.toLowerCase().includes(search)) &&
+    (!shop  ||item.bestShop===shop)
+  );
+  const byGroup={};
+  entries.forEach(([itemId,item]) => {
+    const key = sort==="supermercado" ? (item.bestShop||"Sem supermercado") : (item.categoria||"Sem categoria");
+    if(!byGroup[key]) byGroup[key]=[];
+    byGroup[key].push({itemId,...item});
+  });
+  Object.entries(byGroup).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([groupName,items]) => {
+    const group=document.createElement("div");
+    group.className="lista-category-group";
+    const checked=items.filter(i=>i.checked).length;
+    group.innerHTML=`<div class="lista-cat-header"><h3>${groupName}</h3><span class="cat-badge">${checked}/${items.length}</span></div>`;
+    items.sort((a,b)=>a.name.localeCompare(b.name)).forEach(item => {
+      const row=document.createElement("div");
+      row.className=`lista-item${item.checked?" checked":""}`;
+      row.innerHTML=`
+        <input type="checkbox" class="item-checkbox" ${item.checked?"checked":""} />
+        <div class="item-info">
+          <span class="item-name">${item.name}</span>
+          ${item.bestShop?`<span class="item-shop-tag">${item.bestShop}</span>`:""}
+        </div>
+        <div class="item-qty-wrap">
+          <input type="number" class="item-qty-input" value="${item.qty}" min="0" step="0.1" />
+          <span class="item-unit">${item.unit}</span>
+        </div>`;
+      const cb=row.querySelector(".item-checkbox");
+      cb.addEventListener("change", async () => {
+        row.classList.toggle("checked",cb.checked);
+        await updateListaItem(listaData.id, item.itemId, {checked:cb.checked});
+      });
+      const qi=row.querySelector(".item-qty-input");
+      let timer;
+      qi.addEventListener("input",()=>{ clearTimeout(timer); timer=setTimeout(async()=>{ await updateListaItem(listaData.id,item.itemId,{qty:parseFloat(qi.value)||0}); },600); });
+      group.appendChild(row);
+    });
+    container.appendChild(group);
+  });
+  updateListaSummary(listaData);
+}
+
+function updateListaSummary(listaData) {
+  const all=Object.values(listaData.items), checked=all.filter(i=>i.checked).length, total=all.length;
+  document.getElementById("summary-checked").textContent=checked;
+  document.getElementById("summary-total").textContent=total;
+  document.getElementById("progress-fill").style.width=`${total?(checked/total)*100:0}%`;
+}
+
+document.getElementById("lista-search").addEventListener("input",()=>{ if(state.currentLista) renderLista(state.currentLista); });
+document.getElementById("lista-shop-filter").addEventListener("change",()=>{ if(state.currentLista) renderLista(state.currentLista); });
+document.getElementById("lista-sort").addEventListener("change",()=>{ if(state.currentLista) renderLista(state.currentLista); });
+document.getElementById("btn-back-listas").addEventListener("click",()=>switchView("listas"));
+document.getElementById("btn-share-lista").addEventListener("click",()=>{
+  if(!state.currentListaId) return;
+  const url=shareUrl(state.currentListaId);
+  navigator.clipboard.writeText(url).then(()=>showToast("Link copiado!","success")).catch(()=>prompt("Copia este link:",url));
+});
+
+// ═══════════════════════════════════════════
+// VIEW: GERAR
+// ═══════════════════════════════════════════
+let gerarSelections = new Set();
+
+async function initGerarView() {
+  await loadCatalog();
+  populateCategorySelects();
+  populateShopFilter("gerar-shop-filter");
+  gerarSelections.clear(); updateGerarCount();
+  const input=document.getElementById("gerar-date");
+  input.value=todayStr(); input.min=todayStr();
+  document.getElementById("gerar-nome").value="";
+  document.getElementById("gerar-supermercado").value="";
+  renderGerarCatalog();
+}
+
+function getGerarFilters() {
+  return {
+    search: document.getElementById("gerar-search").value.toLowerCase().trim(),
+    cat:    document.getElementById("gerar-cat-filter").value,
+    shop:   document.getElementById("gerar-shop-filter").value,
+  };
+}
+
+function renderGerarCatalog() {
+  const {search,cat,shop}=getGerarFilters();
+  const container=document.getElementById("gerar-catalog");
+  container.innerHTML="";
+  const cats=Object.entries(state.catalog).filter(([id])=>!cat||id===cat).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
+  if(!cats.length) { container.innerHTML=`<div class="empty-state"><div class="empty-icon">📦</div><p>Nenhum produto.</p></div>`; return; }
+  cats.forEach(([catId,catData]) => {
+    const filteredItems=catData.items.map((item,i)=>({item,i}))
+      .filter(({item})=>(!search||item.name.toLowerCase().includes(search))&&(!shop||item.bestShop===shop));
+    if(!filteredItems.length) return;
+    const group=document.createElement("div"); group.className="gerar-cat-group";
+    const header=document.createElement("div"); header.className="gerar-cat-header";
+    header.innerHTML=`<h3>${catData.nome}</h3><span class="gerar-cat-toggle">▾</span>`;
+    const grid=document.createElement("div"); grid.className="gerar-items-grid";
+    header.addEventListener("click",()=>{ header.classList.toggle("collapsed"); grid.style.display=header.classList.contains("collapsed")?"none":"grid"; });
+    group.appendChild(header);
+    filteredItems.forEach(({item,i})=>{
+      const key=`${catId}|${i}`, isSel=gerarSelections.has(key);
+      const el=document.createElement("div"); el.className=`gerar-item${isSel?" selected":""}`;
+      el.innerHTML=`
+        <input type="checkbox" ${isSel?"checked":""} data-key="${key}" />
+        <div class="gerar-item-info">
+          <div class="gerar-item-name">${item.name}</div>
+          <div class="gerar-item-meta">${item.defaultQty} ${item.unit}${item.bestShop?` · <span class="shop-pill">${item.bestShop}</span>`:""}
+          </div>
+        </div>`;
+      const cb=el.querySelector("input");
+      const toggle=()=>{ if(cb.checked){gerarSelections.add(key);el.classList.add("selected");}else{gerarSelections.delete(key);el.classList.remove("selected");} updateGerarCount(); updateSelectAllState(); };
+      cb.addEventListener("change",toggle);
+      el.addEventListener("click",e=>{ if(e.target!==cb){cb.checked=!cb.checked;toggle();} });
+      grid.appendChild(el);
+    });
+    group.appendChild(grid); container.appendChild(group);
+  });
+  updateSelectAllState();
+}
+
+function updateGerarCount() {
+  const n=gerarSelections.size;
+  document.getElementById("gerar-count").textContent=`${n} produto${n!==1?"s":""} seleccionado${n!==1?"s":""}`;
+  document.getElementById("btn-create-list").disabled=n===0;
+}
+function updateSelectAllState() {
+  const cbs=document.querySelectorAll("#gerar-catalog input[type=checkbox]");
+  document.getElementById("gerar-select-all").checked=cbs.length>0&&[...cbs].every(cb=>cb.checked);
+}
+document.getElementById("gerar-select-all").addEventListener("change",e=>{
+  const checked=e.target.checked;
+  document.querySelectorAll("#gerar-catalog input[type=checkbox]").forEach(cb=>{
+    const key=cb.dataset.key; cb.checked=checked;
+    const el=cb.closest(".gerar-item");
+    if(checked){gerarSelections.add(key);el?.classList.add("selected");}else{gerarSelections.delete(key);el?.classList.remove("selected");}
+  });
+  updateGerarCount();
+});
+document.getElementById("gerar-search").addEventListener("input",renderGerarCatalog);
+document.getElementById("gerar-cat-filter").addEventListener("change",renderGerarCatalog);
+document.getElementById("gerar-shop-filter").addEventListener("change",renderGerarCatalog);
+document.getElementById("gerar-date").addEventListener("change",e=>{
+  if(e.target.value<todayStr()){e.target.value=todayStr();showToast("Não pode seleccionar data passada.","error");}
+});
+document.getElementById("btn-create-list").addEventListener("click",async()=>{
+  const dateStr=document.getElementById("gerar-date").value;
+  const nome   =document.getElementById("gerar-nome").value.trim();
+  const superM =document.getElementById("gerar-supermercado").value.trim();
+  if(!dateStr)           return showToast("Seleccione uma data.","error");
+  if(!nome)              return showToast("Dê um nome à lista.","error");
+  if(!gerarSelections.size) return showToast("Seleccione pelo menos um produto.","error");
+  const btn=document.getElementById("btn-create-list");
+  btn.disabled=true; btn.querySelector("span").textContent="A criar…";
+  try {
+    const items={};
+    gerarSelections.forEach(key=>{
+      const [catId,idxStr]=key.split("|");
+      const catData=state.catalog[catId]; if(!catData) return;
+      const item=catData.items[parseInt(idxStr)];
+      const itemId=generateItemId(catId,item.name);
+      items[itemId]={name:item.name,qty:item.defaultQty,unit:item.unit,checked:false,categoria:catData.nome,bestShop:item.bestShop||""};
+    });
+    const listaId=await saveNewLista({date:dateStr,nome,supermercado:superM,items});
+    showToast(`Lista "${nome}" criada!`,"success");
+    setTimeout(()=>switchView("lista",listaId),700);
+  } catch(e) {
+    console.error(e); showToast("Erro ao criar lista.","error");
+    btn.disabled=false; btn.querySelector("span").textContent="Criar Lista";
+  }
+});
 
 // ═══════════════════════════════════════════
 // VIEW: ADMIN
 // ═══════════════════════════════════════════
 async function initAdminView() {
-  await loadCatalog();
-  populateCategorySelects();
-  renderAdminCatalog();
+  await loadCatalog(); populateCategorySelects(); renderAdminCatalog();
 }
-
 function getAdminFilters() {
-  const search = document.getElementById("admin-search").value.toLowerCase().trim();
-  const cat    = document.getElementById("admin-cat-filter").value;
-  return { search, cat };
+  return { search:document.getElementById("admin-search").value.toLowerCase().trim(), cat:document.getElementById("admin-cat-filter").value };
 }
-
 function renderAdminCatalog() {
-  const { search, cat } = getAdminFilters();
-  const container = document.getElementById("admin-catalog");
-  container.innerHTML = "";
-
-  const cats = Object.entries(state.catalog)
-    .filter(([id]) => !cat || id === cat)
-    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
-
-  if (!cats.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>Nenhuma categoria encontrada.</p><small>Use "Seed Padrão" para adicionar dados de exemplo.</small></div>`;
-    return;
-  }
-
-  cats.forEach(([catId, catData]) => {
-    const filteredItems = catData.items.filter(it =>
-      !search || it.name.toLowerCase().includes(search)
-    );
-    if (search && !filteredItems.length) return;
-
-    const card = document.createElement("div");
-    card.className = "admin-cat-card";
-    card.innerHTML = `
+  const {search,cat}=getAdminFilters();
+  const container=document.getElementById("admin-catalog");
+  container.innerHTML="";
+  const cats=Object.entries(state.catalog).filter(([id])=>!cat||id===cat).sort((a,b)=>a[1].nome.localeCompare(b[1].nome));
+  if(!cats.length) { container.innerHTML=`<div class="empty-state"><div class="empty-icon">📦</div><p>Nenhuma categoria.</p><small>Use "Seed Padrão" para dados de exemplo.</small></div>`; return; }
+  cats.forEach(([catId,catData])=>{
+    const filteredItems=catData.items.filter(it=>!search||it.name.toLowerCase().includes(search));
+    if(search&&!filteredItems.length) return;
+    const card=document.createElement("div"); card.className="admin-cat-card";
+    card.innerHTML=`
       <div class="admin-cat-header">
         <h3>${catData.nome}</h3>
         <div class="admin-cat-actions">
-          <button class="btn-icon" title="Editar categoria" data-action="edit-cat" data-cat="${catId}">✏️</button>
-          <button class="btn-icon danger" title="Eliminar categoria" data-action="delete-cat" data-cat="${catId}">🗑️</button>
+          <button class="btn-icon" data-action="edit-cat" data-cat="${catId}">✏️</button>
+          <button class="btn-icon danger" data-action="delete-cat" data-cat="${catId}">🗑️</button>
         </div>
       </div>
       <div class="admin-items-list">
-        ${filteredItems.map((item, i) => {
-          const realIdx = catData.items.indexOf(item);
-          return `
-          <div class="admin-item-row">
+        ${filteredItems.map(item=>{
+          const realIdx=catData.items.indexOf(item);
+          return `<div class="admin-item-row">
             <span class="admin-item-name">${item.name}</span>
             <span class="admin-item-meta">${item.defaultQty} ${item.unit}</span>
+            ${item.bestShop?`<span class="shop-pill">${item.bestShop}</span>`:""}
             <div class="admin-item-actions">
-              <button class="btn-icon" title="Editar" data-action="edit-item" data-cat="${catId}" data-idx="${realIdx}">✏️</button>
-              <button class="btn-icon danger" title="Eliminar" data-action="delete-item" data-cat="${catId}" data-idx="${realIdx}">🗑️</button>
+              <button class="btn-icon" data-action="edit-item" data-cat="${catId}" data-idx="${realIdx}">✏️</button>
+              <button class="btn-icon danger" data-action="delete-item" data-cat="${catId}" data-idx="${realIdx}">🗑️</button>
             </div>
           </div>`;
         }).join("")}
       </div>
       <div class="admin-add-item">
         <button class="btn-add-item" data-action="add-item" data-cat="${catId}">+ Adicionar produto</button>
-      </div>
-    `;
+      </div>`;
     container.appendChild(card);
   });
-
-  // Events
-  container.querySelectorAll("[data-action]").forEach(el => {
-    el.addEventListener("click", handleAdminAction);
-  });
+  container.querySelectorAll("[data-action]").forEach(el=>el.addEventListener("click",handleAdminAction));
 }
-
 function handleAdminAction(e) {
-  const el = e.currentTarget;
-  const action = el.dataset.action;
-  const catId  = el.dataset.cat;
-  const idx    = el.dataset.idx !== undefined ? parseInt(el.dataset.idx) : null;
-
-  switch (action) {
-    case "edit-cat":    openEditCategoryModal(catId); break;
-    case "delete-cat":  confirmDelete("category", catId); break;
-    case "add-item":    openAddItemModal(catId); break;
-    case "edit-item":   openEditItemModal(catId, idx); break;
-    case "delete-item": confirmDelete("item", catId, idx); break;
-  }
+  const el=e.currentTarget,action=el.dataset.action,catId=el.dataset.cat,idx=el.dataset.idx!==undefined?parseInt(el.dataset.idx):null;
+  if(action==="edit-cat")    openEditCategoryModal(catId);
+  if(action==="delete-cat")  confirmDeleteCat(catId);
+  if(action==="add-item")    openAddItemModal(catId);
+  if(action==="edit-item")   openEditItemModal(catId,idx);
+  if(action==="delete-item") confirmDeleteItem(catId,idx);
 }
-
-// ── Category Modal ───────────────────────────
-document.getElementById("btn-add-category").addEventListener("click", () => {
-  document.getElementById("modal-cat-title").textContent = "Nova Categoria";
-  document.getElementById("cat-name-input").value = "";
-  document.getElementById("cat-id-input").value = "";
+document.getElementById("btn-add-category").addEventListener("click",()=>{
+  document.getElementById("modal-cat-title").textContent="Nova Categoria";
+  document.getElementById("cat-name-input").value=""; document.getElementById("cat-id-input").value="";
   openModal("modal-category");
 });
-
 function openEditCategoryModal(catId) {
-  document.getElementById("modal-cat-title").textContent = "Editar Categoria";
-  document.getElementById("cat-name-input").value = state.catalog[catId].nome;
-  document.getElementById("cat-id-input").value = catId;
+  document.getElementById("modal-cat-title").textContent="Editar Categoria";
+  document.getElementById("cat-name-input").value=state.catalog[catId].nome;
+  document.getElementById("cat-id-input").value=catId;
   openModal("modal-category");
 }
-
-document.getElementById("btn-save-category").addEventListener("click", async () => {
-  const name  = document.getElementById("cat-name-input").value.trim();
-  const oldId = document.getElementById("cat-id-input").value;
-  if (!name) return showToast("Insira o nome da categoria.", "error");
-
-  const newId = slugify(name);
+document.getElementById("btn-save-category").addEventListener("click",async()=>{
+  const name=document.getElementById("cat-name-input").value.trim();
+  const oldId=document.getElementById("cat-id-input").value;
+  if(!name) return showToast("Insira o nome da categoria.","error");
+  const newId=slugify(name);
   try {
-    if (oldId && oldId !== newId) {
-      // Rename: copy to new id, delete old
-      const oldData = state.catalog[oldId];
-      await saveCategoryToFirestore(newId, { ...oldData, nome: name });
-      await deleteCategoryFromFirestore(oldId);
-    } else {
-      const existing = state.catalog[oldId] || { items: [] };
-      await saveCategoryToFirestore(newId, { ...existing, nome: name });
-    }
-    await loadCatalog();
-    populateCategorySelects();
-    renderAdminCatalog();
-    closeModal("modal-category");
-    showToast("Categoria guardada!", "success");
-  } catch (e) {
-    console.error(e); showToast("Erro ao guardar.", "error");
-  }
+    if(oldId&&oldId!==newId){ await saveCategoryToFirestore(newId,{...state.catalog[oldId],nome:name}); await deleteCategoryFromFirestore(oldId); }
+    else { await saveCategoryToFirestore(newId,{...(state.catalog[oldId]||{items:[]}),nome:name}); }
+    await loadCatalog(); populateCategorySelects(); renderAdminCatalog();
+    closeModal("modal-category"); showToast("Categoria guardada!","success");
+  } catch(e){console.error(e);showToast("Erro ao guardar.","error");}
 });
-
-// ── Item Modal ───────────────────────────────
 function openAddItemModal(catId) {
-  document.getElementById("modal-item-title").textContent = "Novo Produto";
-  document.getElementById("item-name-input").value = "";
-  document.getElementById("item-qty-input").value = "1";
-  document.getElementById("item-unit-input").value = "un";
-  document.getElementById("item-cat-input").value = catId;
-  document.getElementById("item-id-input").value = "";
-  document.getElementById("item-original-cat-input").value = catId;
+  document.getElementById("modal-item-title").textContent="Novo Produto";
+  ["item-name-input","item-shop-input"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("item-qty-input").value="1";
+  document.getElementById("item-unit-input").value="un";
+  document.getElementById("item-cat-input").value=catId;
+  document.getElementById("item-id-input").value="";
+  document.getElementById("item-original-cat-input").value=catId;
   openModal("modal-item");
 }
-
-function openEditItemModal(catId, idx) {
-  const item = state.catalog[catId].items[idx];
-  document.getElementById("modal-item-title").textContent = "Editar Produto";
-  document.getElementById("item-name-input").value = item.name;
-  document.getElementById("item-qty-input").value = item.defaultQty;
-  document.getElementById("item-unit-input").value = item.unit;
-  document.getElementById("item-cat-input").value = catId;
-  document.getElementById("item-id-input").value = idx;
-  document.getElementById("item-original-cat-input").value = catId;
+function openEditItemModal(catId,idx) {
+  const item=state.catalog[catId].items[idx];
+  document.getElementById("modal-item-title").textContent="Editar Produto";
+  document.getElementById("item-name-input").value=item.name;
+  document.getElementById("item-qty-input").value=item.defaultQty;
+  document.getElementById("item-unit-input").value=item.unit;
+  document.getElementById("item-shop-input").value=item.bestShop||"";
+  document.getElementById("item-cat-input").value=catId;
+  document.getElementById("item-id-input").value=idx;
+  document.getElementById("item-original-cat-input").value=catId;
   openModal("modal-item");
 }
-
-document.getElementById("btn-save-item").addEventListener("click", async () => {
-  const name    = document.getElementById("item-name-input").value.trim();
-  const qty     = parseFloat(document.getElementById("item-qty-input").value) || 1;
-  const unit    = document.getElementById("item-unit-input").value;
-  const catId   = document.getElementById("item-cat-input").value;
-  const idxRaw  = document.getElementById("item-id-input").value;
-  const origCat = document.getElementById("item-original-cat-input").value;
-
-  if (!name) return showToast("Insira o nome do produto.", "error");
-
+document.getElementById("btn-save-item").addEventListener("click",async()=>{
+  const name    =document.getElementById("item-name-input").value.trim();
+  const qty     =parseFloat(document.getElementById("item-qty-input").value)||1;
+  const unit    =document.getElementById("item-unit-input").value;
+  const bestShop=document.getElementById("item-shop-input").value.trim();
+  const catId   =document.getElementById("item-cat-input").value;
+  const idxRaw  =document.getElementById("item-id-input").value;
+  const origCat =document.getElementById("item-original-cat-input").value;
+  if(!name) return showToast("Insira o nome do produto.","error");
   try {
-    const newItem = { name, defaultQty: qty, unit };
-    if (idxRaw === "") {
-      // Add new
-      const cat = state.catalog[catId];
-      cat.items.push(newItem);
-      await saveCategoryToFirestore(catId, cat);
-    } else {
-      const idx = parseInt(idxRaw);
-      if (origCat === catId) {
-        // Same category: update in place
-        state.catalog[catId].items[idx] = newItem;
-        await saveCategoryToFirestore(catId, state.catalog[catId]);
-      } else {
-        // Moved to different category: remove from old, add to new
-        state.catalog[origCat].items.splice(idx, 1);
-        await saveCategoryToFirestore(origCat, state.catalog[origCat]);
-        state.catalog[catId].items.push(newItem);
-        await saveCategoryToFirestore(catId, state.catalog[catId]);
+    const newItem={name,defaultQty:qty,unit,bestShop};
+    if(idxRaw==="") { state.catalog[catId].items.push(newItem); await saveCategoryToFirestore(catId,state.catalog[catId]); }
+    else {
+      const idx=parseInt(idxRaw);
+      if(origCat===catId){ state.catalog[catId].items[idx]=newItem; await saveCategoryToFirestore(catId,state.catalog[catId]); }
+      else {
+        state.catalog[origCat].items.splice(idx,1); await saveCategoryToFirestore(origCat,state.catalog[origCat]);
+        state.catalog[catId].items.push(newItem); await saveCategoryToFirestore(catId,state.catalog[catId]);
       }
     }
-    await loadCatalog();
-    populateCategorySelects();
-    renderAdminCatalog();
-    closeModal("modal-item");
-    showToast("Produto guardado!", "success");
-  } catch (e) {
-    console.error(e); showToast("Erro ao guardar produto.", "error");
-  }
+    await loadCatalog(); populateCategorySelects(); renderAdminCatalog();
+    closeModal("modal-item"); showToast("Produto guardado!","success");
+  } catch(e){console.error(e);showToast("Erro ao guardar produto.","error");}
 });
-
-// ── Confirm Delete ───────────────────────────
-function confirmDelete(type, catId, itemIdx) {
-  state.pendingDelete = { type, catId, itemIdx };
-  const msgs = {
-    category: `Eliminar a categoria "${state.catalog[catId]?.nome}" e todos os seus produtos?`,
-    item:     `Eliminar o produto "${state.catalog[catId]?.items[itemIdx]?.name}"?`
-  };
-  document.getElementById("confirm-message").textContent = msgs[type];
+function confirmDeleteCat(catId) {
+  state.pendingDelete={type:"category",catId};
+  document.getElementById("confirm-message").textContent=`Eliminar a categoria "${state.catalog[catId]?.nome}" e todos os seus produtos?`;
   openModal("modal-confirm");
 }
-
-document.getElementById("btn-confirm-delete").addEventListener("click", async () => {
-  const { type, catId, itemIdx } = state.pendingDelete;
+function confirmDeleteItem(catId,itemIdx) {
+  state.pendingDelete={type:"item",catId,itemIdx};
+  document.getElementById("confirm-message").textContent=`Eliminar o produto "${state.catalog[catId]?.items[itemIdx]?.name}"?`;
+  openModal("modal-confirm");
+}
+document.getElementById("btn-confirm-delete").addEventListener("click",async()=>{
+  const p=state.pendingDelete;
   try {
-    if (type === "category") {
-      await deleteCategoryFromFirestore(catId);
-    } else {
-      state.catalog[catId].items.splice(itemIdx, 1);
-      await saveCategoryToFirestore(catId, state.catalog[catId]);
+    if(p.type==="lista") {
+      await deleteListaById(p.id); closeModal("modal-confirm"); showToast("Lista eliminada.","success");
+      await loadAllListas(); renderListasGrid();
+    } else if(p.type==="category") {
+      await deleteCategoryFromFirestore(p.catId); await loadCatalog(); populateCategorySelects(); renderAdminCatalog();
+      closeModal("modal-confirm"); showToast("Categoria eliminada.","success");
+    } else if(p.type==="item") {
+      state.catalog[p.catId].items.splice(p.itemIdx,1); await saveCategoryToFirestore(p.catId,state.catalog[p.catId]);
+      await loadCatalog(); populateCategorySelects(); renderAdminCatalog();
+      closeModal("modal-confirm"); showToast("Produto eliminado.","success");
     }
-    await loadCatalog();
-    populateCategorySelects();
-    renderAdminCatalog();
-    closeModal("modal-confirm");
-    showToast("Eliminado com sucesso.", "success");
-  } catch (e) {
-    console.error(e); showToast("Erro ao eliminar.", "error");
-  }
+  } catch(e){console.error(e);showToast("Erro ao eliminar.","error");}
 });
-
-// ── Admin search/filter ──────────────────────
-document.getElementById("admin-search").addEventListener("input", renderAdminCatalog);
-document.getElementById("admin-cat-filter").addEventListener("change", renderAdminCatalog);
-document.getElementById("btn-seed").addEventListener("click", seedCatalog);
+document.getElementById("admin-search").addEventListener("input",renderAdminCatalog);
+document.getElementById("admin-cat-filter").addEventListener("change",renderAdminCatalog);
+document.getElementById("btn-seed").addEventListener("click",seedCatalog);
 
 // ═══════════════════════════════════════════
-// VIEW: LISTA
+// MODAL CLOSE
 // ═══════════════════════════════════════════
-async function initListaView() {
-  await loadListaDates();
-  buildCalendarStrip();
-
-  const input = document.getElementById("lista-date");
-  // Set default to today if has list, else most recent
-  if (state.listaDates.has(todayStr())) {
-    input.value = todayStr();
-  } else {
-    const sorted = [...state.listaDates].sort().reverse();
-    input.value = sorted[0] || todayStr();
-  }
-
-  loadListaForDate(input.value);
-}
-
-function buildCalendarStrip() {
-  const strip = document.getElementById("calendar-strip");
-  strip.innerHTML = "";
-
-  // Show last 30 days + next 7
-  const today = new Date();
-  const days = [];
-  for (let i = -30; i <= 7; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    days.push(d.toISOString().split("T")[0]);
-  }
-
-  const dayNames = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-
-  days.forEach(dateStr => {
-    const d = new Date(dateStr + "T12:00:00");
-    const hasLista = state.listaDates.has(dateStr);
-    if (!hasLista) return; // Only show days with lists in strip
-
-    const el = document.createElement("div");
-    el.className = "cal-day has-list";
-    el.dataset.date = dateStr;
-    el.innerHTML = `
-      <span class="cal-day-label">${dayNames[d.getDay()]}</span>
-      <span class="cal-day-num">${d.getDate()}</span>
-      <span class="cal-day-dot"></span>
-    `;
-    el.addEventListener("click", () => {
-      document.getElementById("lista-date").value = dateStr;
-      loadListaForDate(dateStr);
-    });
-    strip.appendChild(el);
-  });
-
-  if (!strip.children.length) {
-    strip.innerHTML = `<span style="color:var(--ink-3);font-size:.85rem;">Nenhuma lista encontrada.</span>`;
-  }
-}
-
-function updateCalendarStrip(selectedDate) {
-  document.querySelectorAll(".cal-day").forEach(el => {
-    el.classList.toggle("selected", el.dataset.date === selectedDate);
-  });
-}
-
-function loadListaForDate(dateStr) {
-  document.getElementById("lista-loading").classList.remove("hidden");
-  document.getElementById("lista-empty").classList.add("hidden");
-  document.getElementById("lista-content").classList.add("hidden");
-  document.getElementById("lista-summary").classList.add("hidden");
-
-  updateCalendarStrip(dateStr);
-  state.currentListaDate = dateStr;
-
-  // If no list exists for this date, try most recent
-  if (!state.listaDates.has(dateStr)) {
-    getMostRecentLista().then(data => {
-      document.getElementById("lista-loading").classList.add("hidden");
-      if (!data) {
-        document.getElementById("lista-empty").classList.remove("hidden");
-        return;
-      }
-      // Subscribe to most recent
-      subscribeToLista(data.date, renderLista);
-    });
-    return;
-  }
-
-  subscribeToLista(dateStr, listaData => {
-    document.getElementById("lista-loading").classList.add("hidden");
-    if (!listaData) {
-      document.getElementById("lista-empty").classList.remove("hidden");
-      return;
-    }
-    renderLista(listaData);
-  });
-}
-
-function renderLista(listaData) {
-  state.currentLista = listaData;
-  const sort = document.getElementById("lista-sort").value;
-  const container = document.getElementById("lista-content");
-  container.innerHTML = "";
-
-  if (!listaData || !listaData.items || !Object.keys(listaData.items).length) {
-    document.getElementById("lista-empty").classList.remove("hidden");
-    container.classList.add("hidden");
-    return;
-  }
-
-  document.getElementById("lista-empty").classList.add("hidden");
-  container.classList.remove("hidden");
-  document.getElementById("lista-summary").classList.remove("hidden");
-
-  // Group by category
-  const byCategory = {};
-  Object.entries(listaData.items).forEach(([itemId, item]) => {
-    const cat = item.categoria || "Sem categoria";
-    if (!byCategory[cat]) byCategory[cat] = [];
-    byCategory[cat].push({ itemId, ...item });
-  });
-
-  const sortedCats = Object.entries(byCategory).sort((a, b) =>
-    sort === "categoria" ? a[0].localeCompare(b[0]) : a[0].localeCompare(b[0])
-  );
-
-  sortedCats.forEach(([catName, items]) => {
-    const group = document.createElement("div");
-    group.className = "lista-category-group";
-
-    const checked = items.filter(i => i.checked).length;
-    group.innerHTML = `
-      <div class="lista-cat-header">
-        <h3>${catName}</h3>
-        <span class="cat-badge">${checked}/${items.length}</span>
-      </div>
-    `;
-
-    items.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-      const row = document.createElement("div");
-      row.className = `lista-item${item.checked ? " checked" : ""}`;
-      row.innerHTML = `
-        <input type="checkbox" class="item-checkbox" ${item.checked ? "checked" : ""} data-id="${item.itemId}" />
-        <span class="item-name">${item.name}</span>
-        <div class="item-qty-wrap">
-          <input type="number" class="item-qty-input" value="${item.qty}" min="0" step="0.1" data-id="${item.itemId}" />
-          <span class="item-unit">${item.unit}</span>
-        </div>
-      `;
-
-      const checkbox = row.querySelector(".item-checkbox");
-      checkbox.addEventListener("change", async () => {
-        await updateListaItem(listaData.date, item.itemId, { checked: checkbox.checked });
-      });
-
-      const qtyInput = row.querySelector(".item-qty-input");
-      let qtyTimer;
-      qtyInput.addEventListener("input", () => {
-        clearTimeout(qtyTimer);
-        qtyTimer = setTimeout(async () => {
-          const val = parseFloat(qtyInput.value) || 0;
-          await updateListaItem(listaData.date, item.itemId, { qty: val });
-        }, 600);
-      });
-
-      group.appendChild(row);
-    });
-
-    container.appendChild(group);
-  });
-
-  updateListaSummary(listaData);
-}
-
-function updateListaSummary(listaData) {
-  const all = Object.values(listaData.items);
-  const checked = all.filter(i => i.checked).length;
-  const total = all.length;
-  document.getElementById("summary-checked").textContent = checked;
-  document.getElementById("summary-total").textContent = total;
-  const pct = total ? (checked / total) * 100 : 0;
-  document.getElementById("progress-fill").style.width = `${pct}%`;
-}
-
-document.getElementById("lista-date").addEventListener("change", e => {
-  loadListaForDate(e.target.value);
+document.querySelectorAll(".modal-close,[data-modal]").forEach(el=>{
+  el.addEventListener("click",()=>closeModal(el.dataset.modal));
 });
-document.getElementById("lista-sort").addEventListener("change", () => {
-  if (state.currentLista) renderLista(state.currentLista);
-});
-
-// ═══════════════════════════════════════════
-// VIEW: GERAR
-// ═══════════════════════════════════════════
-let gerarSelections = new Set(); // set of "catId|itemIndex"
-
-async function initGerarView() {
-  await loadCatalog();
-  populateCategorySelects();
-  gerarSelections.clear();
-  updateGerarCount();
-
-  // Default date = today, min = today
-  const input = document.getElementById("gerar-date");
-  const today = todayStr();
-  input.value = today;
-  input.min = today;
-
-  renderGerarCatalog();
-}
-
-function getGerarFilters() {
-  const search = document.getElementById("gerar-search").value.toLowerCase().trim();
-  const cat    = document.getElementById("gerar-cat-filter").value;
-  return { search, cat };
-}
-
-function renderGerarCatalog() {
-  const { search, cat } = getGerarFilters();
-  const container = document.getElementById("gerar-catalog");
-  container.innerHTML = "";
-
-  const cats = Object.entries(state.catalog)
-    .filter(([id]) => !cat || id === cat)
-    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
-
-  if (!cats.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>Nenhum produto encontrado.</p></div>`;
-    return;
-  }
-
-  cats.forEach(([catId, catData]) => {
-    const filteredItems = catData.items
-      .map((item, i) => ({ item, i }))
-      .filter(({ item }) => !search || item.name.toLowerCase().includes(search));
-
-    if (!filteredItems.length) return;
-
-    const group = document.createElement("div");
-    group.className = "gerar-cat-group";
-
-    const header = document.createElement("div");
-    header.className = "gerar-cat-header";
-    header.innerHTML = `<h3>${catData.nome}</h3><span class="gerar-cat-toggle">▾</span>`;
-    header.addEventListener("click", () => {
-      header.classList.toggle("collapsed");
-      grid.style.display = header.classList.contains("collapsed") ? "none" : "grid";
-    });
-    group.appendChild(header);
-
-    const grid = document.createElement("div");
-    grid.className = "gerar-items-grid";
-
-    filteredItems.forEach(({ item, i }) => {
-      const key = `${catId}|${i}`;
-      const isSelected = gerarSelections.has(key);
-
-      const el = document.createElement("div");
-      el.className = `gerar-item${isSelected ? " selected" : ""}`;
-      el.innerHTML = `
-        <input type="checkbox" ${isSelected ? "checked" : ""} data-key="${key}" />
-        <div class="gerar-item-info">
-          <div class="gerar-item-name">${item.name}</div>
-          <div class="gerar-item-meta">${item.defaultQty} ${item.unit}</div>
-        </div>
-      `;
-
-      const cb = el.querySelector("input");
-      const toggle = () => {
-        if (cb.checked) { gerarSelections.add(key); el.classList.add("selected"); }
-        else { gerarSelections.delete(key); el.classList.remove("selected"); }
-        updateGerarCount();
-        updateSelectAllState();
-      };
-      cb.addEventListener("change", toggle);
-      el.addEventListener("click", e => {
-        if (e.target !== cb) { cb.checked = !cb.checked; toggle(); }
-      });
-
-      grid.appendChild(el);
-    });
-
-    group.appendChild(grid);
-    container.appendChild(group);
-  });
-
-  updateSelectAllState();
-}
-
-function updateGerarCount() {
-  const n = gerarSelections.size;
-  document.getElementById("gerar-count").textContent = `${n} produto${n !== 1 ? "s" : ""} seleccionado${n !== 1 ? "s" : ""}`;
-  document.getElementById("btn-create-list").disabled = n === 0;
-}
-
-function updateSelectAllState() {
-  const allCbs = document.querySelectorAll("#gerar-catalog input[type=checkbox]");
-  const allChecked = allCbs.length > 0 && [...allCbs].every(cb => cb.checked);
-  document.getElementById("gerar-select-all").checked = allChecked;
-}
-
-document.getElementById("gerar-select-all").addEventListener("change", e => {
-  const checked = e.target.checked;
-  document.querySelectorAll("#gerar-catalog input[type=checkbox]").forEach(cb => {
-    const key = cb.dataset.key;
-    cb.checked = checked;
-    const el = cb.closest(".gerar-item");
-    if (checked) { gerarSelections.add(key); el?.classList.add("selected"); }
-    else { gerarSelections.delete(key); el?.classList.remove("selected"); }
-  });
-  updateGerarCount();
-});
-
-document.getElementById("gerar-search").addEventListener("input", renderGerarCatalog);
-document.getElementById("gerar-cat-filter").addEventListener("change", renderGerarCatalog);
-
-// Enforce min date
-document.getElementById("gerar-date").addEventListener("change", e => {
-  if (e.target.value < todayStr()) {
-    e.target.value = todayStr();
-    showToast("Não é possível seleccionar uma data passada.", "error");
-  }
-});
-
-document.getElementById("btn-create-list").addEventListener("click", async () => {
-  const dateStr = document.getElementById("gerar-date").value;
-  if (!dateStr) return showToast("Seleccione uma data.", "error");
-  if (dateStr < todayStr()) return showToast("Data inválida.", "error");
-  if (!gerarSelections.size) return showToast("Seleccione pelo menos um produto.", "error");
-
-  const btn = document.getElementById("btn-create-list");
-  btn.disabled = true;
-  btn.querySelector("span").textContent = "A criar…";
-
-  try {
-    const items = {};
-    gerarSelections.forEach(key => {
-      const [catId, idxStr] = key.split("|");
-      const idx = parseInt(idxStr);
-      const catData = state.catalog[catId];
-      if (!catData) return;
-      const item = catData.items[idx];
-      const itemId = generateItemId(catId, item.name);
-      items[itemId] = {
-        name:      item.name,
-        qty:       item.defaultQty,
-        unit:      item.unit,
-        checked:   false,
-        categoria: catData.nome
-      };
-    });
-
-    await saveNewLista(dateStr, items);
-    state.listaDates.add(dateStr);
-    showToast(`Lista para ${formatDatePT(dateStr)} criada!`, "success");
-
-    // Switch to Lista view on that date
-    setTimeout(() => {
-      document.getElementById("lista-date").value = dateStr;
-      switchView("lista");
-    }, 800);
-  } catch (e) {
-    console.error(e);
-    showToast("Erro ao criar lista.", "error");
-    btn.disabled = false;
-    btn.querySelector("span").textContent = "Criar Lista";
-  }
-});
-
-// ═══════════════════════════════════════════
-// MODAL CLOSE (generic)
-// ═══════════════════════════════════════════
-document.querySelectorAll(".modal-close, [data-modal]").forEach(el => {
-  el.addEventListener("click", () => closeModal(el.dataset.modal));
-});
-document.querySelectorAll(".modal-overlay").forEach(overlay => {
-  overlay.addEventListener("click", e => {
-    if (e.target === overlay) closeModal(overlay.id);
-  });
+document.querySelectorAll(".modal-overlay").forEach(overlay=>{
+  overlay.addEventListener("click",e=>{ if(e.target===overlay) closeModal(overlay.id); });
 });
 
 // ═══════════════════════════════════════════
 // BOOTSTRAP
 // ═══════════════════════════════════════════
-(async () => {
+(async()=>{
   try {
-    // Start on Lista view
     await loadCatalog();
-    await loadListaDates();
-    switchView("lista");
-  } catch (e) {
-    console.error("Erro de inicialização:", e);
-    // Show a user-friendly error if Firebase is not configured
-    if (e.message && (e.message.includes("projectId") || e.message.includes("API key") || e.message.includes("YOUR_"))) {
-      document.body.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;text-align:center;padding:20px;background:#F5F3EE;">
-          <div style="max-width:480px;">
-            <div style="font-size:3rem;margin-bottom:16px;">🔥</div>
-            <h2 style="font-family:Syne,sans-serif;margin-bottom:12px;">Firebase não configurado</h2>
-            <p style="color:#4A453F;margin-bottom:16px;">Edite o ficheiro <code style="background:#E2DDD5;padding:2px 6px;border-radius:4px;">firebase.js</code> e substitua os valores de <code>YOUR_*</code> pelas credenciais do seu projecto Firebase.</p>
-            <p style="color:#8C857A;font-size:.875rem;">Consulte a <a href="https://firebase.google.com/docs/web/setup" target="_blank" style="color:#2D6A4F;">documentação do Firebase</a> para obter as suas credenciais.</p>
-          </div>
-        </div>
-      `;
-    }
+    switchView("listas");
+  } catch(e) {
+    console.error("Erro de inicialização:",e);
+    document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;text-align:center;padding:20px;background:#F5F3EE;"><div style="max-width:480px;"><div style="font-size:3rem;margin-bottom:16px;">🔥</div><h2 style="margin-bottom:12px;">Erro de ligação</h2><p style="color:#4A453F;">${e.message}</p></div></div>`;
   }
 })();

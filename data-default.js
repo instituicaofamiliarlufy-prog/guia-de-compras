@@ -1,110 +1,61 @@
-// data-default.js
-// Default catalog seed data (Portuguese grocery categories)
-
+// data-default.js — Catálogo com bestShop (Angola)
 export const defaultCatalog = {
-  "Frutas e Legumes": [
-    { name: "Maçã",          defaultQty: 6,   unit: "un"   },
-    { name: "Banana",        defaultQty: 1,   unit: "kg"   },
-    { name: "Laranja",       defaultQty: 2,   unit: "kg"   },
-    { name: "Limão",         defaultQty: 4,   unit: "un"   },
-    { name: "Tomate",        defaultQty: 1,   unit: "kg"   },
-    { name: "Cebola",        defaultQty: 1,   unit: "kg"   },
-    { name: "Alho",          defaultQty: 2,   unit: "un"   },
-    { name: "Batata",        defaultQty: 2,   unit: "kg"   },
-    { name: "Cenoura",       defaultQty: 1,   unit: "kg"   },
-    { name: "Brócolos",      defaultQty: 1,   unit: "un"   },
-    { name: "Couve",         defaultQty: 1,   unit: "un"   },
-    { name: "Espinafres",    defaultQty: 300, unit: "g"    },
-    { name: "Pimento",       defaultQty: 3,   unit: "un"   },
-    { name: "Pepino",        defaultQty: 2,   unit: "un"   },
-    { name: "Alface",        defaultQty: 1,   unit: "un"   }
-  ],
-
-  "Carnes e Peixe": [
-    { name: "Frango Inteiro",  defaultQty: 1,   unit: "un"   },
-    { name: "Peito de Frango", defaultQty: 1,   unit: "kg"   },
-    { name: "Carne Picada",    defaultQty: 500, unit: "g"    },
-    { name: "Bifes de Vaca",   defaultQty: 4,   unit: "un"   },
-    { name: "Entrecosto",      defaultQty: 1,   unit: "kg"   },
-    { name: "Salmão",          defaultQty: 4,   unit: "un"   },
-    { name: "Bacalhau",        defaultQty: 500, unit: "g"    },
-    { name: "Camarão",         defaultQty: 500, unit: "g"    },
-    { name: "Atum em Lata",    defaultQty: 3,   unit: "un"   },
-    { name: "Sardinha",        defaultQty: 500, unit: "g"    }
-  ],
-
-  "Lacticínios e Ovos": [
-    { name: "Leite Meio-gordo", defaultQty: 2,  unit: "L"    },
-    { name: "Iogurte Natural",  defaultQty: 4,  unit: "un"   },
-    { name: "Queijo Flamengo",  defaultQty: 1,  unit: "un"   },
-    { name: "Queijo da Serra",  defaultQty: 200, unit: "g"   },
-    { name: "Manteiga",         defaultQty: 1,  unit: "un"   },
-    { name: "Natas",            defaultQty: 1,  unit: "un"   },
-    { name: "Ovos",             defaultQty: 1,  unit: "dz"   }
-  ],
-
-  "Padaria e Pastelaria": [
-    { name: "Pão de Forma",     defaultQty: 1,  unit: "un"   },
-    { name: "Baguete",          defaultQty: 4,  unit: "un"   },
-    { name: "Pão de Cereais",   defaultQty: 1,  unit: "un"   },
-    { name: "Croissant",        defaultQty: 4,  unit: "un"   }
-  ],
-
-  "Mercearia e Conservas": [
-    { name: "Arroz",            defaultQty: 1,   unit: "kg"   },
-    { name: "Massa Esparguete", defaultQty: 500, unit: "g"    },
-    { name: "Massa Penne",      defaultQty: 500, unit: "g"    },
-    { name: "Feijão Vermelho",  defaultQty: 2,   unit: "un"   },
-    { name: "Grão-de-Bico",     defaultQty: 1,   unit: "un"   },
-    { name: "Lentilhas",        defaultQty: 500, unit: "g"    },
-    { name: "Polpa de Tomate",  defaultQty: 3,   unit: "un"   },
-    { name: "Tomate Pelado",    defaultQty: 2,   unit: "un"   },
-    { name: "Azeite",           defaultQty: 750, unit: "ml"   },
-    { name: "Óleo",             defaultQty: 1,   unit: "L"    },
-    { name: "Vinagre",          defaultQty: 1,   unit: "un"   },
-    { name: "Sal",              defaultQty: 1,   unit: "kg"   },
-    { name: "Açúcar",           defaultQty: 1,   unit: "kg"   },
-    { name: "Farinha",          defaultQty: 1,   unit: "kg"   }
-  ],
-
   "Bebidas": [
-    { name: "Água Mineral",     defaultQty: 6,   unit: "L"    },
-    { name: "Sumo de Laranja",  defaultQty: 1,   unit: "L"    },
-    { name: "Sumo de Maçã",     defaultQty: 1,   unit: "L"    },
-    { name: "Refrigerante Cola",defaultQty: 1,   unit: "L"    },
-    { name: "Café Moído",       defaultQty: 250, unit: "g"    },
-    { name: "Cápsulas Café",    defaultQty: 1,   unit: "cx"   },
-    { name: "Chá Verde",        defaultQty: 1,   unit: "cx"   },
-    { name: "Cerveja",          defaultQty: 1,   unit: "pack" },
-    { name: "Vinho Tinto",      defaultQty: 1,   unit: "un"   }
+    { name: "Água 5L",                    defaultQty: 1,     unit: "un", bestShop: "Deskontão"  },
+    { name: "Água Bom Jesus 12x500ml",    defaultQty: 1,     unit: "un", bestShop: "Freshmart"  },
+    { name: "Chá Camomila Lipton",        defaultQty: 1,     unit: "cx", bestShop: "Angomart"   },
+    { name: "Chá Cidreira Lipton",        defaultQty: 1,     unit: "cx", bestShop: "Fresmart"   },
+    { name: "Néctar Compal Ananás 1L",    defaultQty: 1,     unit: "un", bestShop: "Maxi"       },
+    { name: "Sumo Ceres 200ml (Vários)",  defaultQty: 2,     unit: "un", bestShop: "Angomart"   },
+    { name: "Licor Amarula",              defaultQty: 1,     unit: "un", bestShop: "Shoprite"   }
   ],
-
-  "Congelados": [
-    { name: "Legumes Mistos",   defaultQty: 1,   unit: "kg"   },
-    { name: "Ervilhas",         defaultQty: 400, unit: "g"    },
-    { name: "Batata Frita",     defaultQty: 1,   unit: "kg"   },
-    { name: "Pizza",            defaultQty: 2,   unit: "un"   }
+  "Frutas, Legumes e Verduras": [
+    { name: "Abacate Kg",                 defaultQty: 1,     unit: "kg", bestShop: "Angomart"     },
+    { name: "Ananás Kg",                  defaultQty: 1,     unit: "kg", bestShop: "Shoprite"     },
+    { name: "Banana de Mesa Kg",          defaultQty: 3.246, unit: "kg", bestShop: "Freshmart"    },
+    { name: "Goiaba Mix Kg",              defaultQty: 1,     unit: "kg", bestShop: "Freshmart"    },
+    { name: "Maçã Golden Importada",      defaultQty: 1,     unit: "kg", bestShop: "Intermarket"  },
+    { name: "Maçã Top Red Importada",     defaultQty: 1,     unit: "kg", bestShop: "Maxi"         },
+    { name: "Mamão Kg",                   defaultQty: 1,     unit: "kg", bestShop: "Deskontão"    },
+    { name: "Manga Nacional Kg",          defaultQty: 1,     unit: "kg", bestShop: "Deskontão"    },
+    { name: "Melancia Kg",                defaultQty: 1,     unit: "kg", bestShop: "Shoprite"     },
+    { name: "Mirtilo 4x50g",             defaultQty: 1,     unit: "pack",bestShop: "Shoprite"    },
+    { name: "Morango Nacional",           defaultQty: 0.27,  unit: "kg", bestShop: "Intermarket"  },
+    { name: "Pera Packhams / Importada",  defaultQty: 1,     unit: "kg", bestShop: "Fresmart"     },
+    { name: "Pêssego Importado",          defaultQty: 1,     unit: "kg", bestShop: "Intermarket"  },
+    { name: "Tangerina / Clementina",     defaultQty: 1,     unit: "kg", bestShop: "Shoprite"     },
+    { name: "Uva Red Globe 500g",         defaultQty: 1,     unit: "un", bestShop: "Angomart"     },
+    { name: "Batata Rena Importada",      defaultQty: 1,     unit: "kg", bestShop: "Fresmart"     },
+    { name: "Cebola Importada Kg",        defaultQty: 1,     unit: "kg", bestShop: "Maxi"         },
+    { name: "Tomate Mini 300g",           defaultQty: 1,     unit: "un", bestShop: "Freshmart"    }
   ],
-
+  "Grãos e Mercearia": [
+    { name: "Cereais Corn Flakes Nacional 1kg", defaultQty: 1, unit: "un", bestShop: "Angomart"  },
+    { name: "Sementes Girassol Pv 200ml",       defaultQty: 1, unit: "un", bestShop: "Deskontão" },
+    { name: "Azeite Gallo Puro 750ml",          defaultQty: 1, unit: "un", bestShop: "Angomart"  },
+    { name: "Farinha de Trigo Donna Maria 1kg", defaultQty: 1, unit: "un", bestShop: "Fresmart"  },
+    { name: "Massa Espirais Milaneza",          defaultQty: 1, unit: "un", bestShop: "Fresmart"  },
+    { name: "Óleo de Soja Fula 1L",            defaultQty: 1, unit: "un", bestShop: "Fresmart"  },
+    { name: "Vinagre Balsâmico Pd 250ml",      defaultQty: 1, unit: "un", bestShop: "Deskontão" },
+    { name: "Ketchup Heinz",                   defaultQty: 1, unit: "un", bestShop: "Maxi"      }
+  ],
   "Higiene e Limpeza": [
-    { name: "Detergente Louça", defaultQty: 1,   unit: "un"   },
-    { name: "Detergente Roupa", defaultQty: 1,   unit: "un"   },
-    { name: "Amaciador",        defaultQty: 1,   unit: "un"   },
-    { name: "Papel Higiénico",  defaultQty: 1,   unit: "pack" },
-    { name: "Papel de Cozinha", defaultQty: 2,   unit: "un"   },
-    { name: "Champô",           defaultQty: 1,   unit: "un"   },
-    { name: "Gel de Banho",     defaultQty: 1,   unit: "un"   },
-    { name: "Pasta de Dentes",  defaultQty: 1,   unit: "un"   },
-    { name: "Sabonete",         defaultQty: 2,   unit: "un"   },
-    { name: "Desodorizante",    defaultQty: 1,   unit: "un"   }
+    { name: "Papel Higiénico Saluna (12 Rolos)", defaultQty: 1, unit: "un", bestShop: "Fresmart"       },
+    { name: "Toalhitas Smartcare 80un",          defaultQty: 1, unit: "un", bestShop: "Angomart"       },
+    { name: "Saco Fresmart / Angomart",          defaultQty: 5, unit: "un", bestShop: "Vários (Kz 10)" }
   ],
-
-  "Snacks e Doces": [
-    { name: "Bolachas",         defaultQty: 2,   unit: "pack" },
-    { name: "Chocolates",       defaultQty: 2,   unit: "un"   },
-    { name: "Batata Frita Pac.",defaultQty: 2,   unit: "pack" },
-    { name: "Cereais",          defaultQty: 1,   unit: "cx"   },
-    { name: "Mel",              defaultQty: 1,   unit: "un"   },
-    { name: "Compota",          defaultQty: 1,   unit: "un"   }
+  "Laticínios e Frios": [
+    { name: "Leite Gordo Mimosa 1L",              defaultQty: 6,     unit: "L",  bestShop: "Fresmart"  },
+    { name: "Leite Meio Gordo S/ Lactose PD 1L",  defaultQty: 6,     unit: "L",  bestShop: "Deskontão" },
+    { name: "Iogurte Natural Deleite 1kg",        defaultQty: 1,     unit: "un", bestShop: "Angomart"  },
+    { name: "Manteiga Mimosa c/ Sal 125g",        defaultQty: 1,     unit: "un", bestShop: "Deskontão" },
+    { name: "Queijo Flamengo Barra Fatiado",      defaultQty: 0.235, unit: "kg", bestShop: "Deskontão" },
+    { name: "Presunto Sem Osso Fatiado",          defaultQty: 0.195, unit: "kg", bestShop: "Deskontão" }
+  ],
+  "Talho e Congelados": [
+    { name: "Coxa de Frango Pkt 5kg",        defaultQty: 1,     unit: "pack", bestShop: "Fresmart" },
+    { name: "Entrecosto de Porco Sanodia",   defaultQty: 0.564, unit: "kg",   bestShop: "Fresmart" },
+    { name: "Filete de Pescada Oceano 1kg",  defaultQty: 1,     unit: "kg",   bestShop: "Fresmart" },
+    { name: "Gelado Chocolate Amanhecer 1L", defaultQty: 1,     unit: "un",   bestShop: "Fresmart" }
   ]
 };

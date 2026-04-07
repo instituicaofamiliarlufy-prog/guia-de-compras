@@ -709,3 +709,170 @@ input[type="date"]:focus, select:focus {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+
+/* ═══════════════════════════════════════════
+   v5.3 ADDITIONS
+═══════════════════════════════════════════ */
+
+/* ── Listagem de listas (home) ─────────────── */
+.listas-date-group { margin-bottom: 28px; }
+.listas-date-label {
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+.lista-card {
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.lista-card:hover { box-shadow: var(--shadow); border-color: var(--border); }
+.lista-card-body {
+  flex: 1;
+  padding: 16px 18px;
+  cursor: pointer;
+}
+.lista-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.lista-card-nome {
+  font-family: 'Syne', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.lista-card-shop {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--accent-dk);
+  background: var(--accent-lt);
+  padding: 2px 9px;
+  border-radius: 100px;
+}
+.lista-card-meta {
+  font-size: .8rem;
+  color: var(--ink-3);
+  font-weight: 300;
+}
+.lista-card-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 1px solid var(--border-soft);
+  background: var(--bg);
+}
+
+/* ── Lista view header ─────────────────────── */
+.lista-view-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.btn-back {
+  font-family: 'Syne', sans-serif;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-back:hover { background: var(--surface-2); color: var(--ink); }
+.lista-view-info { flex: 1; min-width: 0; }
+.lista-view-info h2 { font-size: 1.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lista-view-meta { display: flex; gap: 12px; font-size: .8rem; color: var(--ink-3); margin-top: 2px; flex-wrap: wrap; }
+.btn-sm { padding: 7px 14px !important; font-size: .8rem !important; white-space: nowrap; flex-shrink: 0; }
+
+/* ── Gerar meta bar ────────────────────────── */
+.gerar-meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.input-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
+.input-wrap label,
+.date-picker-wrap label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+}
+.input-wrap input {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: inherit;
+  font-size: .9rem;
+  color: var(--ink);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.input-wrap input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lt);
+  background: var(--surface);
+}
+
+/* ── Shop pill ─────────────────────────────── */
+.shop-pill {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  background: var(--accent-lt);
+  color: var(--accent-dk);
+  padding: 1px 7px;
+  border-radius: 100px;
+}
+.item-shop-tag {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: var(--accent-lt);
+  color: var(--accent-dk);
+  padding: 2px 7px;
+  border-radius: 100px;
+  margin-top: 3px;
+}
+.item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ── Lista controls ────────────────────────── */
+.lista-controls { margin-bottom: 18px; }
+
+/* ── Responsive extras ─────────────────────── */
+@media (max-width: 600px) {
+  .lista-view-header { gap: 10px; }
+  .lista-view-info h2 { font-size: 1.1rem; }
+  .gerar-meta-bar { flex-direction: column; }
+  .lista-card-actions { flex-direction: row; padding: 8px; border-left: none; border-top: 1px solid var(--border-soft); }
+}
