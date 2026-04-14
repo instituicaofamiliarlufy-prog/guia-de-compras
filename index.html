@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Guia de Compras v5.3</title>
+  <title>Guia de Compras v5.4</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,19 +17,13 @@
         <span class="brand-icon">🛒</span>
         <div class="brand-text">
           <h1 id="brand-link" style="cursor:pointer;">Guia de Compras</h1>
-          <span class="brand-version">v5.3</span>
+          <span class="brand-version">v5.4</span>
         </div>
       </div>
       <nav class="main-nav">
-        <button class="nav-btn" data-view="lista">
-          <span class="nav-icon">📋</span><span>Listas</span>
-        </button>
-        <button class="nav-btn" data-view="gerar">
-          <span class="nav-icon">✨</span><span>Gerar</span>
-        </button>
-        <button class="nav-btn" data-view="admin">
-          <span class="nav-icon">⚙️</span><span>Admin</span>
-        </button>
+        <button class="nav-btn" data-view="lista"><span class="nav-icon">📋</span><span>Listas</span></button>
+        <button class="nav-btn" data-view="gerar"><span class="nav-icon">✨</span><span>Gerar</span></button>
+        <button class="nav-btn" data-view="admin"><span class="nav-icon">⚙️</span><span>Admin</span></button>
       </nav>
     </div>
   </header>
@@ -38,9 +32,7 @@
 
   <main class="app-main">
 
-    <!-- ═══════════════════════════════════
-         VIEW: LISTAGEM DE LISTAS (home)
-    ═══════════════════════════════════ -->
+    <!-- ══════════ VIEW: LISTAGEM ══════════ -->
     <section id="view-listas" class="view hidden">
       <div class="view-header">
         <h2>As Minhas Listas</h2>
@@ -49,9 +41,7 @@
       <div id="listas-grid"></div>
     </section>
 
-    <!-- ═══════════════════════════════════
-         VIEW: LISTA (detalhe)
-    ═══════════════════════════════════ -->
+    <!-- ══════════ VIEW: LISTA DETALHE ══════════ -->
     <section id="view-lista" class="view hidden">
       <div class="lista-view-header">
         <button id="btn-back-listas" class="btn-back">← Voltar</button>
@@ -62,7 +52,10 @@
             <span id="lista-view-shop"></span>
           </div>
         </div>
-        <button id="btn-share-lista" class="btn-secondary btn-sm">🔗 Partilhar</button>
+        <div class="lista-header-actions">
+          <button id="btn-add-to-lista" class="btn-secondary btn-sm">+ Produto</button>
+          <button id="btn-share-lista" class="btn-secondary btn-sm">🔗 Partilhar</button>
+        </div>
       </div>
 
       <div class="lista-controls">
@@ -79,23 +72,24 @@
         </div>
       </div>
 
-      <div id="lista-loading" class="loading-state">
-        <div class="spinner"></div><span>A carregar lista…</span>
-      </div>
-      <div id="lista-empty" class="empty-state hidden">
-        <div class="empty-icon">🗒️</div>
-        <p>Lista não encontrada.</p>
-      </div>
+      <div id="lista-loading" class="loading-state"><div class="spinner"></div><span>A carregar…</span></div>
+      <div id="lista-empty" class="empty-state hidden"><div class="empty-icon">🗒️</div><p>Lista vazia.</p></div>
       <div id="lista-content" class="lista-content hidden"></div>
+
+      <div id="lista-budget" class="budget-bar hidden">
+        <div class="budget-inner">
+          <span class="budget-label">Orçamento estimado</span>
+          <span id="budget-total" class="budget-total">Kz 0</span>
+        </div>
+      </div>
+
       <div id="lista-summary" class="lista-summary hidden">
         <span id="summary-checked">0</span> / <span id="summary-total">0</span> itens marcados
         <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════
-         VIEW: GERAR
-    ═══════════════════════════════════ -->
+    <!-- ══════════ VIEW: GERAR ══════════ -->
     <section id="view-gerar" class="view hidden">
       <div class="view-header">
         <h2>Gerar Nova Lista</h2>
@@ -109,12 +103,25 @@
         </div>
         <div class="input-wrap">
           <label for="gerar-nome">📝 Nome da lista</label>
-          <input type="text" id="gerar-nome" placeholder="Ex: Compras semanais" />
+          <input type="text" id="gerar-nome" placeholder="Compras semanais" />
         </div>
         <div class="input-wrap">
-          <label for="gerar-supermercado">🛍️ Supermercado principal</label>
-          <input type="text" id="gerar-supermercado" placeholder="Opcional" />
+          <label for="gerar-supermercado">🛍️ Supermercado sugerido</label>
+          <input type="text" id="gerar-supermercado" placeholder="Calculado automaticamente…" readonly />
         </div>
+      </div>
+
+      <!-- Shop distribution bar -->
+      <div id="gerar-shop-dist" class="shop-dist hidden">
+        <div class="shop-dist-label">Distribuição por supermercado (por valor)</div>
+        <div id="shop-dist-bars" class="shop-dist-bars"></div>
+        <div id="shop-dist-legend" class="shop-dist-legend"></div>
+      </div>
+
+      <!-- Gerar budget preview -->
+      <div id="gerar-budget-preview" class="gerar-budget-preview hidden">
+        <span class="budget-label">Orçamento estimado</span>
+        <span id="gerar-budget-total" class="budget-total">Kz 0</span>
       </div>
 
       <div class="filter-bar">
@@ -139,9 +146,7 @@
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════
-         VIEW: ADMIN
-    ═══════════════════════════════════ -->
+    <!-- ══════════ VIEW: ADMIN ══════════ -->
     <section id="view-admin" class="view hidden">
       <div class="view-header">
         <h2>Administração do Catálogo</h2>
@@ -165,11 +170,9 @@
 
   </main>
 
-  <!-- ═══════════════════════════════════
-       MODALS
-  ═══════════════════════════════════ -->
+  <!-- ══════════ MODALS ══════════ -->
 
-  <!-- Edit Lista -->
+  <!-- Edit Lista metadata -->
   <div id="modal-edit-lista" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-header">
@@ -188,6 +191,30 @@
       <div class="modal-footer">
         <button class="btn-secondary" data-modal="modal-edit-lista">Cancelar</button>
         <button id="btn-save-edit-lista" class="btn-primary">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add product to existing lista -->
+  <div id="modal-add-to-lista" class="modal-overlay hidden">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>Adicionar Produtos à Lista</h3>
+        <button class="modal-close" data-modal="modal-add-to-lista">✕</button>
+      </div>
+      <div class="modal-body" style="padding-bottom:0;">
+        <div class="filter-bar" style="margin-bottom:12px;">
+          <div class="search-wrap" style="flex:1;">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="add-product-search" placeholder="Pesquisar…" />
+          </div>
+          <select id="add-product-cat"></select>
+        </div>
+        <div id="add-product-list" class="add-product-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-modal="modal-add-to-lista">Cancelar</button>
+        <button id="btn-confirm-add-products" class="btn-primary">Adicionar Seleccionados</button>
       </div>
     </div>
   </div>
@@ -225,15 +252,13 @@
         <input type="number" id="item-qty-input" placeholder="1" min="0" step="0.01" />
         <label>Unidade</label>
         <select id="item-unit-input">
-          <option value="un">un (unidades)</option>
-          <option value="kg">kg (quilograma)</option>
-          <option value="g">g (grama)</option>
-          <option value="L">L (litro)</option>
-          <option value="ml">ml (mililitro)</option>
-          <option value="cx">cx (caixa)</option>
-          <option value="pack">pack</option>
-          <option value="dz">dz (dúzia)</option>
+          <option value="un">un</option><option value="kg">kg</option>
+          <option value="g">g</option><option value="L">L</option>
+          <option value="ml">ml</option><option value="cx">cx</option>
+          <option value="pack">pack</option><option value="dz">dz</option>
         </select>
+        <label>Preço estimado (Kz)</label>
+        <input type="number" id="item-preco-input" placeholder="0" min="0" step="1" />
         <label>Supermercado sugerido</label>
         <input type="text" id="item-shop-input" placeholder="Ex: Fresmart" />
         <label>Categoria</label>
@@ -248,16 +273,14 @@
     </div>
   </div>
 
-  <!-- Confirm Delete -->
+  <!-- Confirm -->
   <div id="modal-confirm" class="modal-overlay hidden">
     <div class="modal modal-sm">
       <div class="modal-header">
         <h3>Confirmar</h3>
         <button class="modal-close" data-modal="modal-confirm">✕</button>
       </div>
-      <div class="modal-body">
-        <p id="confirm-message"></p>
-      </div>
+      <div class="modal-body"><p id="confirm-message"></p></div>
       <div class="modal-footer">
         <button class="btn-secondary" data-modal="modal-confirm">Cancelar</button>
         <button id="btn-confirm-delete" class="btn-danger">Eliminar</button>

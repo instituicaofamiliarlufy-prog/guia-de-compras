@@ -1,58 +1,54 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Lista de Compras</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --bg:#F5F3EE; --surface:#fff; --surface-2:#F0EDE6;
-      --border:#E2DDD5; --border-soft:#EDE9E1;
-      --ink:#1A1714; --ink-2:#4A453F; --ink-3:#8C857A;
-      --accent:#2D6A4F; --accent-lt:#D8EFE3; --accent-dk:#1B4332;
-      --warn:#E07A5F; --warn-lt:#FAE3DC;
-      --radius:12px; --radius-lg:18px;
-      --shadow-sm:0 1px 3px rgba(26,23,20,.06);
-      --shadow:0 4px 16px rgba(26,23,20,.08);
-      --shadow-lg:0 12px 40px rgba(26,23,20,.12);
+      --bg:#F5F3EE;--surface:#fff;--surface-2:#F0EDE6;
+      --border:#E2DDD5;--border-soft:#EDE9E1;
+      --ink:#1A1714;--ink-2:#4A453F;--ink-3:#8C857A;
+      --accent:#2D6A4F;--accent-lt:#D8EFE3;--accent-dk:#1B4332;
+      --gold:#C9A84C;--gold-lt:#FBF3DC;
+      --warn:#E07A5F;
+      --radius:12px;--radius-lg:18px;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    html{font-size:16px;scroll-behavior:smooth;}
+    html{font-size:16px;}
     body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;}
     h1,h2,h3{font-family:'Syne',sans-serif;line-height:1.2;}
 
-    /* Header */
-    .viewer-header{
-      background:var(--surface);border-bottom:1px solid var(--border);
-      padding:16px 20px;position:sticky;top:0;z-index:10;
-    }
-    .viewer-header-inner{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:12px;}
-    .viewer-brand{display:flex;align-items:center;gap:8px;color:var(--ink-3);font-size:.8rem;font-weight:500;}
-    .viewer-brand span{font-size:1.2rem;}
+    .viewer-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:10;}
+    .viewer-header-inner{max-width:640px;margin:0 auto;display:flex;align-items:flex-start;gap:12px;}
+    .viewer-brand{font-size:.75rem;color:var(--ink-3);font-weight:500;white-space:nowrap;margin-top:4px;}
     .viewer-title{flex:1;}
-    .viewer-title h1{font-size:1.15rem;font-weight:800;}
-    .viewer-meta{font-size:.8rem;color:var(--ink-3);display:flex;gap:10px;margin-top:2px;flex-wrap:wrap;}
+    .viewer-title h1{font-size:1.1rem;font-weight:800;}
+    .viewer-meta{font-size:.78rem;color:var(--ink-3);display:flex;gap:10px;margin-top:3px;flex-wrap:wrap;align-items:center;}
+    .viewer-shop-badge{background:var(--accent-lt);color:var(--accent-dk);font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:100px;}
 
-    /* Filters */
-    .viewer-filters{max-width:640px;margin:16px auto;padding:0 16px;display:flex;flex-wrap:wrap;gap:10px;}
-    .search-wrap{position:relative;flex:1;min-width:180px;}
-    .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:.9rem;pointer-events:none;}
-    .search-wrap input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:inherit;font-size:.9rem;color:var(--ink);}
-    .search-wrap input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lt);}
-    select{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:inherit;font-size:.9rem;color:var(--ink);}
-    select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lt);}
+    /* Budget in header */
+    .viewer-budget{background:var(--gold-lt);border:1px solid #e8d48a;border-radius:var(--radius);padding:6px 14px;text-align:center;flex-shrink:0;}
+    .viewer-budget-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);display:block;}
+    .viewer-budget-val{font-family:'Syne',sans-serif;font-size:1rem;font-weight:800;color:#7a5c00;}
 
-    /* Content */
-    .viewer-main{max-width:640px;margin:0 auto;padding:0 16px 100px;}
+    .viewer-filters{max-width:640px;margin:14px auto;padding:0 16px;display:flex;flex-wrap:wrap;gap:10px;}
+    .search-wrap{position:relative;flex:1;min-width:160px;}
+    .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:.85rem;pointer-events:none;}
+    .search-wrap input{width:100%;padding:8px 12px 8px 32px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:inherit;font-size:.88rem;color:var(--ink);}
+    .search-wrap input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lt);}
+    select{padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:inherit;font-size:.88rem;color:var(--ink);}
 
-    .category-group{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow-sm);}
-    .cat-header{display:flex;align-items:center;gap:10px;padding:12px 18px;background:var(--surface-2);border-bottom:1px solid var(--border-soft);}
-    .cat-header h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);flex:1;}
-    .cat-badge{font-size:.72rem;padding:2px 8px;border-radius:100px;background:var(--border);color:var(--ink-3);font-weight:600;}
-    .item-row{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border-soft);transition:background .15s;}
+    .viewer-main{max-width:640px;margin:0 auto;padding:0 16px 110px;}
+    .category-group{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(26,23,20,.06);}
+    .cat-header{display:flex;align-items:center;gap:10px;padding:11px 18px;background:var(--surface-2);border-bottom:1px solid var(--border-soft);}
+    .cat-header h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);flex:1;}
+    .cat-badge{font-size:.7rem;padding:2px 8px;border-radius:100px;background:var(--border);color:var(--ink-3);font-weight:600;}
+
+    .item-row{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border-soft);transition:background .15s;}
     .item-row:last-child{border-bottom:none;}
     .item-row:hover{background:var(--bg);}
     .item-row.checked{opacity:.5;}
@@ -62,38 +58,34 @@
     .item-checkbox:checked{background:var(--accent);border-color:var(--accent);}
     .item-checkbox:checked::after{content:'';position:absolute;left:5px;top:2px;width:8px;height:12px;border:2.5px solid #fff;border-top:none;border-left:none;transform:rotate(45deg);}
 
-    .item-info{flex:1;min-width:0;}
-    .item-name{font-size:.92rem;font-weight:400;display:block;}
-    .item-shop-tag{display:inline-block;font-size:.68rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:var(--accent-lt);color:var(--accent-dk);padding:2px 7px;border-radius:100px;margin-top:3px;}
+    .item-info{flex:1;min-width:0;display:flex;flex-direction:column;}
+    .item-name{font-size:.9rem;}
+    .item-shop-tag{display:inline-block;font-size:.65rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--accent-lt);color:var(--accent-dk);padding:1px 6px;border-radius:100px;margin-top:3px;align-self:flex-start;}
 
-    .item-qty-wrap{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-    .item-qty-input{width:64px;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-size:.85rem;background:var(--bg);font-family:inherit;}
+    .item-qty-wrap{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+    .item-qty-input{width:60px;padding:5px 7px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-size:.82rem;background:var(--bg);font-family:inherit;}
     .item-qty-input:focus{outline:none;border-color:var(--accent);}
-    .item-unit{font-size:.78rem;color:var(--ink-3);font-weight:500;}
+    .item-unit{font-size:.75rem;color:var(--ink-3);font-weight:500;}
+    .item-line-total{font-size:.75rem;color:var(--ink-3);white-space:nowrap;min-width:60px;text-align:right;}
 
-    /* Summary */
-    .summary-bar{position:fixed;bottom:0;left:0;right:0;background:var(--ink);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:.85rem;font-weight:500;z-index:10;box-shadow:0 -4px 20px rgba(0,0,0,.15);}
+    /* Summary bar */
+    .summary-bar{position:fixed;bottom:0;left:0;right:0;background:var(--ink);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:.82rem;font-weight:500;z-index:10;box-shadow:0 -4px 20px rgba(0,0,0,.15);}
     .summary-bar.hidden{display:none;}
-    .progress-bar{width:120px;height:4px;background:rgba(255,255,255,.25);border-radius:100px;overflow:hidden;}
+    .progress-bar{width:100px;height:4px;background:rgba(255,255,255,.25);border-radius:100px;overflow:hidden;}
     .progress-fill{height:100%;background:var(--accent-lt);border-radius:100px;transition:width .3s ease;width:0%;}
+    .summary-budget{font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;color:var(--gold-lt);}
 
-    /* States */
     .loading-state,.empty-state{text-align:center;padding:60px 20px;color:var(--ink-3);}
-    .spinner{width:24px;height:24px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;margin-bottom:12px;}
+    .spinner{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;margin-bottom:10px;}
     @keyframes spin{to{transform:rotate(360deg);}}
-    .empty-icon{font-size:3rem;margin-bottom:16px;}
+    .empty-icon{font-size:2.5rem;margin-bottom:12px;}
     .hidden{display:none;}
-
-    /* Sort select */
-    .viewer-sort{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--ink-3);}
-    .viewer-sort select{font-size:.8rem;padding:6px 10px;}
-
     @media(max-width:480px){
-      .viewer-filters{flex-direction:column;}
-      .summary-bar{flex-direction:column;gap:8px;padding:12px 16px;}
+      .viewer-header-inner{flex-wrap:wrap;}
+      .viewer-budget{width:100%;}
+      .summary-bar{flex-wrap:wrap;gap:8px;padding:10px 14px;}
     }
-    ::-webkit-scrollbar{width:6px;height:6px;}
-    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar{width:5px;}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:100px;}
   </style>
 </head>
@@ -101,13 +93,17 @@
 
   <header class="viewer-header">
     <div class="viewer-header-inner">
-      <div class="viewer-brand"><span>🛒</span> Guia de Compras</div>
+      <div class="viewer-brand">🛒 Guia de Compras</div>
       <div class="viewer-title">
         <h1 id="v-title">A carregar…</h1>
         <div class="viewer-meta">
           <span id="v-date"></span>
-          <span id="v-shop"></span>
+          <span id="v-shop-badge" class="viewer-shop-badge hidden"></span>
         </div>
+      </div>
+      <div id="v-budget-box" class="viewer-budget hidden">
+        <span class="viewer-budget-label">Orçamento</span>
+        <span id="v-budget-val" class="viewer-budget-val">Kz 0</span>
       </div>
     </div>
   </header>
@@ -115,21 +111,18 @@
   <div class="viewer-filters">
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input type="text" id="v-search" placeholder="Filtrar produto…" />
+      <input type="text" id="v-search" placeholder="Filtrar produto…"/>
     </div>
     <select id="v-shop-filter"></select>
-    <div class="viewer-sort">
-      <select id="v-sort">
-        <option value="categoria">Por categoria</option>
-        <option value="supermercado">Por supermercado</option>
-      </select>
-    </div>
+    <select id="v-sort">
+      <option value="categoria">Por categoria</option>
+      <option value="supermercado">Por supermercado</option>
+    </select>
   </div>
 
   <main class="viewer-main">
     <div id="v-loading" class="loading-state">
-      <div class="spinner"></div>
-      <p>A carregar lista…</p>
+      <div class="spinner"></div><p>A carregar lista…</p>
     </div>
     <div id="v-error" class="empty-state hidden">
       <div class="empty-icon">⚠️</div>
@@ -139,13 +132,14 @@
   </main>
 
   <div id="v-summary" class="summary-bar hidden">
-    <span><strong id="v-checked">0</strong> / <span id="v-total">0</span> itens marcados</span>
+    <span><strong id="v-checked">0</strong> / <span id="v-total">0</span> itens</span>
     <div class="progress-bar"><div id="v-progress" class="progress-fill"></div></div>
+    <span id="v-budget-summary" class="summary-budget"></span>
   </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, onSnapshot, updateDoc }
+import { getFirestore, doc, onSnapshot, updateDoc, deleteField }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -163,11 +157,16 @@ const db  = getFirestore(app);
 const params  = new URLSearchParams(location.search);
 const listaId = params.get("lista");
 
-function formatDatePT(s) { if(!s) return ""; const [y,m,d]=s.split("-"); return `${d}/${m}/${y}`; }
+function formatDatePT(s){ if(!s) return ""; const [y,m,d]=s.split("-"); return `${d}/${m}/${y}`; }
+function fmtKz(v){ return "Kz "+Math.round(v).toLocaleString("pt-AO"); }
+
+function calcBudget(items){
+  return Object.values(items||{}).reduce((s,it)=>s+(it.qty||0)*(it.preco||0),0);
+}
 
 let currentData = null;
 
-function getFilters() {
+function getFilters(){
   return {
     search: document.getElementById("v-search").value.toLowerCase().trim(),
     shop:   document.getElementById("v-shop-filter").value,
@@ -175,52 +174,59 @@ function getFilters() {
   };
 }
 
-function populateShopFilter(data) {
-  const shops = new Set();
-  Object.values(data.items||{}).forEach(it => { if(it.bestShop) shops.add(it.bestShop); });
-  const sel = document.getElementById("v-shop-filter");
-  const val = sel.value;
-  sel.innerHTML = '<option value="">Todos os supermercados</option>' +
+function populateShopFilter(data){
+  const shops=new Set();
+  Object.values(data.items||{}).forEach(it=>{ if(it.bestShop) shops.add(it.bestShop); });
+  const sel=document.getElementById("v-shop-filter"), val=sel.value;
+  sel.innerHTML='<option value="">Todos os supermercados</option>'+
     [...shops].sort().map(s=>`<option value="${s}">${s}</option>`).join("");
-  sel.value = val;
+  sel.value=val;
 }
 
-function render(data) {
-  currentData = data;
-  const {search, shop, sort} = getFilters();
-  const container = document.getElementById("v-content");
-  container.innerHTML = "";
+function render(data){
+  currentData=data;
+  const {search,shop,sort}=getFilters();
+  const container=document.getElementById("v-content");
+  container.innerHTML="";
 
-  let entries = Object.entries(data.items||{}).filter(([,item]) =>
-    (!search || item.name.toLowerCase().includes(search)) &&
-    (!shop   || item.bestShop === shop)
+  // Budget
+  const budgetTotal=calcBudget(data.items);
+  document.getElementById("v-budget-val").textContent=fmtKz(budgetTotal);
+  document.getElementById("v-budget-box").classList.toggle("hidden", budgetTotal===0);
+  document.getElementById("v-budget-summary").textContent=budgetTotal>0?fmtKz(budgetTotal):"";
+
+  let entries=Object.entries(data.items||{}).filter(([,item])=>
+    (!search||item.name.toLowerCase().includes(search))&&
+    (!shop  ||item.bestShop===shop)
   );
 
   const byGroup={};
-  entries.forEach(([itemId,item]) => {
-    const key = sort==="supermercado" ? (item.bestShop||"Sem supermercado") : (item.categoria||"Sem categoria");
+  entries.forEach(([itemId,item])=>{
+    const key=sort==="supermercado"?(item.bestShop||"Sem supermercado"):(item.categoria||"Sem categoria");
     if(!byGroup[key]) byGroup[key]=[];
     byGroup[key].push({itemId,...item});
   });
 
   Object.entries(byGroup).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([groupName,items])=>{
-    const group = document.createElement("div");
-    group.className="category-group";
+    const group=document.createElement("div"); group.className="category-group";
     const checked=items.filter(i=>i.checked).length;
     group.innerHTML=`<div class="cat-header"><h3>${groupName}</h3><span class="cat-badge">${checked}/${items.length}</span></div>`;
     items.sort((a,b)=>a.name.localeCompare(b.name)).forEach(item=>{
+      const lineTotal=(item.qty||0)*(item.preco||0);
       const row=document.createElement("div");
       row.className=`item-row${item.checked?" checked":""}`;
       row.innerHTML=`
-        <input type="checkbox" class="item-checkbox" ${item.checked?"checked":""} />
+        <input type="checkbox" class="item-checkbox" ${item.checked?"checked":""}/>
         <div class="item-info">
           <span class="item-name">${item.name}</span>
           ${item.bestShop?`<span class="item-shop-tag">${item.bestShop}</span>`:""}
         </div>
         <div class="item-qty-wrap">
-          <input type="number" class="item-qty-input" value="${item.qty}" min="0" step="0.1" />
+          <input type="number" class="item-qty-input" value="${item.qty}" min="0" step="0.1"/>
           <span class="item-unit">${item.unit}</span>
-        </div>`;
+        </div>
+        ${item.preco?`<span class="item-line-total">${fmtKz(lineTotal)}</span>`:""}`;
+
       const cb=row.querySelector(".item-checkbox");
       cb.addEventListener("change",async()=>{
         row.classList.toggle("checked",cb.checked);
@@ -229,49 +235,66 @@ function render(data) {
       });
       const qi=row.querySelector(".item-qty-input");
       let timer;
-      qi.addEventListener("input",()=>{ clearTimeout(timer); timer=setTimeout(async()=>{
-        const upd={}; upd[`items.${item.itemId}.qty`]=parseFloat(qi.value)||0;
-        await updateDoc(doc(db,"listas",listaId),upd);
-      },600); });
+      qi.addEventListener("input",()=>{
+        clearTimeout(timer);
+        timer=setTimeout(async()=>{
+          const qty=parseFloat(qi.value)||0;
+          const upd={}; upd[`items.${item.itemId}.qty`]=qty;
+          await updateDoc(doc(db,"listas",listaId),upd);
+          const lt=row.querySelector(".item-line-total");
+          if(lt) lt.textContent=fmtKz(qty*(item.preco||0));
+        },500);
+      });
       group.appendChild(row);
     });
     container.appendChild(group);
   });
 
   // Summary
-  const all=Object.values(data.items||{}), chk=all.filter(i=>i.checked).length, tot=all.length;
+  const all=Object.values(data.items||{});
+  const chk=all.filter(i=>i.checked).length, tot=all.length;
   document.getElementById("v-checked").textContent=chk;
   document.getElementById("v-total").textContent=tot;
   document.getElementById("v-progress").style.width=`${tot?(chk/tot)*100:0}%`;
   document.getElementById("v-summary").classList.toggle("hidden",tot===0);
 }
 
-if (!listaId) {
+if(!listaId){
   document.getElementById("v-loading").classList.add("hidden");
   document.getElementById("v-error").classList.remove("hidden");
   document.getElementById("v-error-msg").textContent="Link inválido — nenhuma lista especificada.";
 } else {
-  onSnapshot(doc(db,"listas",listaId), snap => {
+  onSnapshot(doc(db,"listas",listaId),snap=>{
     document.getElementById("v-loading").classList.add("hidden");
-    if (!snap.exists()) {
+    if(!snap.exists()){
       document.getElementById("v-error").classList.remove("hidden");
-      document.getElementById("v-error-msg").textContent="Lista não encontrada ou foi eliminada.";
+      document.getElementById("v-error-msg").textContent="Lista não encontrada ou eliminada.";
       return;
     }
-    const data = {id:snap.id,...snap.data()};
-    document.title = `${data.nome||"Lista"} · Guia de Compras`;
-    document.getElementById("v-title").textContent = data.nome || formatDatePT(data.date) || "Lista";
-    document.getElementById("v-date").textContent  = formatDatePT(data.date);
-    document.getElementById("v-shop").textContent  = data.supermercado ? `🛍️ ${data.supermercado}` : "";
+    const data={id:snap.id,...snap.data()};
+    document.title=`${data.nome||"Lista"} · Guia de Compras`;
+    document.getElementById("v-title").textContent=data.nome||formatDatePT(data.date)||"Lista";
+    document.getElementById("v-date").textContent=formatDatePT(data.date);
+
+    // Shop badge
+    const shopBadge=document.getElementById("v-shop-badge");
+    if(data.supermercado){
+      shopBadge.textContent=`🛍️ ${data.supermercado}`;
+      shopBadge.classList.remove("hidden");
+    } else {
+      shopBadge.classList.add("hidden");
+    }
+
     populateShopFilter(data);
     render(data);
   });
 }
 
 ["v-search","v-shop-filter","v-sort"].forEach(id=>{
-  document.getElementById(id).addEventListener(id==="v-search"?"input":"change",()=>{
-    if(currentData) render(currentData);
-  });
+  document.getElementById(id).addEventListener(
+    id==="v-search"?"input":"change",
+    ()=>{ if(currentData) render(currentData); }
+  );
 });
 </script>
 </body>
