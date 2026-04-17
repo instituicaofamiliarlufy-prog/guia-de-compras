@@ -52,8 +52,9 @@
           </div>
         </div>
         <div class="lista-header-actions">
-          <button id="btn-add-to-lista" class="btn-secondary btn-sm">+ Produto</button>
-          <button id="btn-share-lista"   class="btn-secondary btn-sm">🔗 Partilhar</button>
+          <button id="btn-add-to-lista"    class="btn-secondary btn-sm">+ Produto</button>
+          <button id="btn-share-lista"    class="btn-secondary btn-sm">🔗 Partilhar</button>
+          <button id="btn-itinerario"     class="btn-primary   btn-sm">🗺️ Itinerário</button>
         </div>
       </div>
       <div class="lista-controls">
@@ -314,6 +315,129 @@
         <button class="btn-secondary" data-modal="modal-confirm">Cancelar</button>
         <button id="btn-confirm-delete" class="btn-danger">Eliminar</button>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ══════ MODAL: ITINERÁRIO INTELIGENTE ══════ -->
+  <div id="modal-itinerario" class="modal-overlay hidden">
+    <div class="modal modal-itinerario">
+      <div class="modal-header">
+        <div class="iti-header-left">
+          <span class="iti-icon">🗺️</span>
+          <div>
+            <h3>Itinerário Inteligente</h3>
+            <p class="iti-subtitle">Rota optimizada para as suas compras</p>
+          </div>
+        </div>
+        <button class="modal-close" data-modal="modal-itinerario">✕</button>
+      </div>
+
+      <!-- Step 1: Config -->
+      <div id="iti-step-config" class="iti-step">
+        <div class="iti-section-label">Ponto de partida</div>
+
+        <div class="iti-origin-tabs">
+          <button class="iti-origin-tab active" data-origin="gps">📍 Localização actual</button>
+          <button class="iti-origin-tab" data-origin="manual">✏️ Introduzir morada</button>
+        </div>
+
+        <div id="iti-origin-gps" class="iti-origin-panel">
+          <p class="iti-hint">Será utilizada a localização actual do dispositivo.</p>
+          <button id="btn-get-location" class="btn-secondary" style="width:100%">
+            📡 Obter localização
+          </button>
+          <div id="iti-gps-status" class="iti-status-line"></div>
+        </div>
+
+        <div id="iti-origin-manual" class="iti-origin-panel hidden">
+          <label>Latitude</label>
+          <input type="number" id="iti-lat" placeholder="-8.836" step="0.0001" value="-8.836"/>
+          <label>Longitude</label>
+          <input type="number" id="iti-lng" placeholder="13.234" step="0.0001" value="13.234"/>
+          <p class="iti-hint">Coordenadas do ponto de partida (ex: centro de Luanda).</p>
+        </div>
+
+        <div class="iti-section-label" style="margin-top:16px">Destino final</div>
+        <div class="iti-radio-group">
+          <label class="iti-radio">
+            <input type="radio" name="iti-dest" value="return" checked/>
+            <span>Regressar ao ponto de partida</span>
+          </label>
+          <label class="iti-radio">
+            <input type="radio" name="iti-dest" value="last"/>
+            <span>Terminar no último supermercado</span>
+          </label>
+        </div>
+
+        <div class="iti-shops-preview">
+          <div class="iti-section-label">Supermercados a visitar</div>
+          <div id="iti-shops-list" class="iti-shops-chips"></div>
+        </div>
+
+        <div id="iti-config-error" class="iti-error hidden"></div>
+
+        <div class="modal-footer" style="border-top:none;padding:16px 0 0">
+          <button class="btn-secondary" data-modal="modal-itinerario">Cancelar</button>
+          <button id="btn-calc-itinerario" class="btn-primary">
+            <span>Calcular Rota</span><span class="btn-arrow">→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Loading -->
+      <div id="iti-step-loading" class="iti-step hidden">
+        <div class="iti-loading-anim">
+          <div class="iti-pulse-ring"></div>
+          <span class="iti-loading-icon">🗺️</span>
+        </div>
+        <div id="iti-loading-status" class="iti-loading-status">A iniciar…</div>
+      </div>
+
+      <!-- Step 3: Result -->
+      <div id="iti-step-result" class="iti-step hidden">
+        <!-- Summary strip -->
+        <div class="iti-summary-strip">
+          <div class="iti-summary-stat">
+            <span class="iti-stat-val" id="iti-total-time">—</span>
+            <span class="iti-stat-label">Tempo total</span>
+          </div>
+          <div class="iti-summary-divider"></div>
+          <div class="iti-summary-stat">
+            <span class="iti-stat-val" id="iti-total-dist">—</span>
+            <span class="iti-stat-label">Distância</span>
+          </div>
+          <div class="iti-summary-divider"></div>
+          <div class="iti-summary-stat">
+            <span class="iti-stat-val" id="iti-total-stops">—</span>
+            <span class="iti-stat-label">Paragens</span>
+          </div>
+        </div>
+
+        <!-- Map toggle -->
+        <div class="iti-map-toggle-bar">
+          <button id="btn-toggle-map" class="iti-map-toggle-btn">
+            <span id="iti-map-toggle-label">🗺️ Ver no mapa</span>
+          </button>
+        </div>
+
+        <!-- Map container -->
+        <div id="iti-map-container" class="iti-map-container hidden">
+          <div id="iti-map" class="iti-map"></div>
+        </div>
+
+        <!-- Ordered stops -->
+        <div class="iti-section-label" style="margin:16px 0 10px">Ordem de visita</div>
+        <div id="iti-route-steps" class="iti-route-steps"></div>
+
+        <div id="iti-skipped" class="iti-skipped hidden"></div>
+
+        <div class="modal-footer" style="border-top:none;padding:16px 0 0">
+          <button id="btn-iti-back" class="btn-secondary">← Recalcular</button>
+          <button class="btn-secondary" data-modal="modal-itinerario">Fechar</button>
+        </div>
+      </div>
+
     </div>
   </div>
 

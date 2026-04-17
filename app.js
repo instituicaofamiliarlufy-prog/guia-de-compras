@@ -1164,3 +1164,281 @@ document.querySelectorAll(".modal-overlay").forEach(overlay => {
       <p style="color:#8C857A;font-size:.875rem">Verifique a configuração do Firebase e as permissões do Firestore.</p></div></div>`;
   }
 })();
+
+// ═══════════════════════════════════════════════════
+// ITINERÁRIO INTELIGENTE
+// ═══════════════════════════════════════════════════
+import { buildItinerary, formatDuration, formatDistance, renderMap } from "./itinerario.js";
+
+// ── State ───────────────────────────────────────────
+const itiState = {
+  originLatLng: null,
+  result:       null,
+  mapRendered:  false,
+};
+
+// ── Open modal ──────────────────────────────────────
+document.getElementById("btn-itinerario").addEventListener("click", () => {
+  if (!state.currentLista) return;
+
+  // Reset to config step
+  showItiStep("config");
+  itiState.originLatLng = null;
+  itiState.result       = null;
+  itiState.mapRendered  = false;
+  document.getElementById("iti-config-error").classList.add("hidden");
+  document.getElementById("iti-gps-status").textContent = "";
+
+  // Populate shop chips from current lista
+  populateItiShops();
+  openModal("modal-itinerario");
+});
+
+// ── Step navigation ─────────────────────────────────
+function showItiStep(name) {
+  ["config", "loading", "result"].forEach(s => {
+    document.getElementById(`iti-step-${s}`).classList.toggle("hidden", s !== name);
+  });
+}
+
+// ── Origin tabs ─────────────────────────────────────
+document.querySelectorAll(".iti-origin-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".iti-origin-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const mode = tab.dataset.origin;
+    document.getElementById("iti-origin-gps").classList.toggle("hidden",    mode !== "gps");
+    document.getElementById("iti-origin-manual").classList.toggle("hidden",  mode !== "manual");
+  });
+});
+
+// ── Get GPS location ─────────────────────────────────
+document.getElementById("btn-get-location").addEventListener("click", () => {
+  const statusEl = document.getElementById("iti-gps-status");
+  if (!navigator.geolocation) {
+    statusEl.textContent = "⚠️ Geolocalização não suportada neste dispositivo.";
+    statusEl.className   = "iti-status-line error";
+    return;
+  }
+  statusEl.textContent = "A obter localização…";
+  statusEl.className   = "iti-status-line";
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      itiState.originLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      statusEl.textContent  = `✅ Localização obtida: ${itiState.originLatLng.lat.toFixed(4)}, ${itiState.originLatLng.lng.toFixed(4)}`;
+      statusEl.className    = "iti-status-line success";
+    },
+    err => {
+      statusEl.textContent = `⚠️ ${err.message}`;
+      statusEl.className   = "iti-status-line error";
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+});
+
+// ── Populate shop chips ───────────────────────────────
+function populateItiShops() {
+  const container = document.getElementById("iti-shops-list");
+  container.innerHTML = "";
+  const shops = getShopsFromLista();
+  if (!shops.length) {
+    container.innerHTML = `<span class="iti-no-shops">Nenhum supermercado identificado na lista.</span>`;
+    return;
+  }
+  shops.forEach(s => {
+    const chip = document.createElement("span");
+    chip.className = "iti-shop-chip";
+    chip.style.setProperty("--chip-color", s.cor || "#2D6A4F");
+    chip.innerHTML = `<span class="chip-dot" style="background:${s.cor||"#2D6A4F"}"></span>${s.nome}`;
+    container.appendChild(chip);
+  });
+}
+
+// Extract unique shops from current lista (resolved via catalog)
+function getShopsFromLista() {
+  if (!state.currentLista?.items) return [];
+  const seen  = new Set();
+  const shops = [];
+  Object.values(state.currentLista.items).forEach(listaItem => {
+    const r = resolveItem(listaItem);
+    if (!r || !r.shopId) return;
+    if (seen.has(r.shopId)) return;
+    seen.add(r.shopId);
+    const shop = state.supermercados[r.shopId];
+    shops.push({ shopId: r.shopId, nome: shop?.nome || r.shopId, cor: shop?.cor || "#888" });
+  });
+  return shops;
+}
+
+// ── Calculate itinerary ───────────────────────────────
+document.getElementById("btn-calc-itinerario").addEventListener("click", async () => {
+  const errorEl = document.getElementById("iti-config-error");
+  errorEl.classList.add("hidden");
+
+  // Determine origin
+  const activeTab = document.querySelector(".iti-origin-tab.active")?.dataset.origin;
+  let origin;
+
+  if (activeTab === "gps") {
+    if (!itiState.originLatLng) {
+      errorEl.textContent = "Clique em 'Obter localização' primeiro.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    origin = itiState.originLatLng;
+  } else {
+    const lat = parseFloat(document.getElementById("iti-lat").value);
+    const lng = parseFloat(document.getElementById("iti-lng").value);
+    if (isNaN(lat) || isNaN(lng)) {
+      errorEl.textContent = "Introduza coordenadas válidas.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    origin = { lat, lng };
+  }
+
+  const shops = getShopsFromLista();
+  if (!shops.length) {
+    errorEl.textContent = "A lista não tem supermercados identificados nos produtos.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const returnToOrigin = document.querySelector("input[name='iti-dest']:checked")?.value === "return";
+
+  showItiStep("loading");
+  document.getElementById("iti-map-container").classList.add("hidden");
+  itiState.mapRendered = false;
+  document.getElementById("btn-toggle-map").querySelector("span").textContent = "🗺️ Ver no mapa";
+
+  try {
+    const result = await buildItinerary({
+      shops,
+      origin,
+      returnToOrigin,
+      onStatus: msg => { document.getElementById("iti-loading-status").textContent = msg; },
+    });
+
+    itiState.result       = result;
+    itiState.originLatLng = origin;
+    renderItiResult(result);
+    showItiStep("result");
+  } catch (e) {
+    console.error(e);
+    showItiStep("config");
+    errorEl.textContent = `❌ ${e.message}`;
+    errorEl.classList.remove("hidden");
+  }
+});
+
+// ── Render result ─────────────────────────────────────
+function renderItiResult(result) {
+  document.getElementById("iti-total-time").textContent  = formatDuration(result.totalDuration);
+  document.getElementById("iti-total-dist").textContent  = formatDistance(result.totalDistance);
+  document.getElementById("iti-total-stops").textContent = result.stops.length;
+
+  // Route steps
+  const stepsEl = document.getElementById("iti-route-steps");
+  stepsEl.innerHTML = "";
+
+  // Origin node
+  const originNode = document.createElement("div");
+  originNode.className = "iti-step-node origin";
+  originNode.innerHTML = `
+    <div class="iti-step-dot origin-dot">⬤</div>
+    <div class="iti-step-info">
+      <span class="iti-step-label">Ponto de partida</span>
+      <span class="iti-step-coords">${result.origin.lat.toFixed(4)}, ${result.origin.lng.toFixed(4)}</span>
+    </div>`;
+  stepsEl.appendChild(originNode);
+
+  result.stops.forEach((stop, i) => {
+    const shop    = Object.values(state.supermercados).find(s => s.nome === stop.shopName) || {};
+    const cor     = shop.cor || "#2D6A4F";
+    const leg     = result.legs[i] || {};
+    const legSecs = parseDuration(leg.duration || "0s");
+    const legDist = leg.distanceMeters || 0;
+
+    // Connector line
+    const connector = document.createElement("div");
+    connector.className = "iti-connector";
+    connector.innerHTML = `<div class="iti-connector-line"></div>
+      <div class="iti-connector-info">${formatDuration(legSecs)} · ${formatDistance(legDist)}</div>`;
+    stepsEl.appendChild(connector);
+
+    // Stop node
+    const node = document.createElement("div");
+    node.className = "iti-step-node";
+    node.innerHTML = `
+      <div class="iti-step-num" style="background:${cor}">${i + 1}</div>
+      <div class="iti-step-info">
+        <span class="iti-step-label">${stop.displayName}</span>
+        <span class="iti-step-address">${stop.address}</span>
+      </div>`;
+    stepsEl.appendChild(node);
+  });
+
+  // Return node (if applicable)
+  if (result.returnToOrigin) {
+    const lastLeg  = result.legs[result.stops.length] || {};
+    const legSecs  = parseDuration(lastLeg.duration || "0s");
+    const legDist  = lastLeg.distanceMeters || 0;
+    const connector = document.createElement("div");
+    connector.className = "iti-connector";
+    connector.innerHTML = `<div class="iti-connector-line"></div>
+      <div class="iti-connector-info">${formatDuration(legSecs)} · ${formatDistance(legDist)}</div>`;
+    stepsEl.appendChild(connector);
+    const returnNode = document.createElement("div");
+    returnNode.className = "iti-step-node origin";
+    returnNode.innerHTML = `
+      <div class="iti-step-dot origin-dot">⬤</div>
+      <div class="iti-step-info"><span class="iti-step-label">Regressar ao ponto de partida</span></div>`;
+    stepsEl.appendChild(returnNode);
+  }
+
+  // Skipped shops
+  const skippedEl = document.getElementById("iti-skipped");
+  if (result.skipped?.length) {
+    skippedEl.textContent = `⚠️ Não encontradas filiais para: ${result.skipped.map(s => s.shopName).join(", ")}`;
+    skippedEl.classList.remove("hidden");
+  } else {
+    skippedEl.classList.add("hidden");
+  }
+}
+
+function parseDuration(s) {
+  const m = s.match(/(\d+)s/); return m ? parseInt(m[1]) : 0;
+}
+
+// ── Map toggle ────────────────────────────────────────
+document.getElementById("btn-toggle-map").addEventListener("click", async () => {
+  const container = document.getElementById("iti-map-container");
+  const label     = document.getElementById("iti-map-toggle-label");
+  const hidden    = container.classList.contains("hidden");
+
+  if (hidden) {
+    container.classList.remove("hidden");
+    label.textContent = "🗺️ Ocultar mapa";
+    if (!itiState.mapRendered && itiState.result) {
+      label.textContent = "⏳ A carregar mapa…";
+      try {
+        await renderMap("iti-map", itiState.result);
+        itiState.mapRendered = true;
+        label.textContent = "🗺️ Ocultar mapa";
+      } catch (e) {
+        label.textContent = "⚠️ Erro ao carregar mapa";
+        console.error(e);
+      }
+    }
+  } else {
+    container.classList.add("hidden");
+    label.textContent = "🗺️ Ver no mapa";
+  }
+});
+
+// ── Back to config ────────────────────────────────────
+document.getElementById("btn-iti-back").addEventListener("click", () => {
+  itiState.mapRendered = false;
+  document.getElementById("iti-map-container").classList.add("hidden");
+  showItiStep("config");
+});
