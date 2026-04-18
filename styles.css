@@ -1476,3 +1476,127 @@ input[type="color"] {
   .iti-stat-val { font-size: 1rem; }
   .iti-origin-tabs { flex-direction: column; }
 }
+
+/* ═══════════════════════════════════════════
+   AD-HOC PRODUCTS
+═══════════════════════════════════════════ */
+
+/* ── Toggle button ───────────────────────────── */
+.adhoc-section {
+  border-top: 1px solid var(--border-soft);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.adhoc-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  font-family: 'Syne', sans-serif;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+}
+.adhoc-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-dk);
+  background: var(--accent-lt);
+}
+.adhoc-toggle-btn.open {
+  border-color: var(--accent);
+  background: var(--accent-lt);
+  color: var(--accent-dk);
+}
+.adhoc-toggle-icon {
+  font-size: 1.1rem;
+  font-weight: 400;
+  flex-shrink: 0;
+  transition: transform var(--transition);
+}
+.adhoc-toggle-btn.open .adhoc-toggle-icon { transform: rotate(45deg); }
+
+/* ── Adhoc form ──────────────────────────────── */
+.adhoc-form {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  animation: fadeIn .2s ease;
+}
+.adhoc-form.hidden { display: none; }
+
+.adhoc-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 80px 90px;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.adhoc-field { display: flex; flex-direction: column; gap: 3px; }
+.adhoc-field-name { grid-column: 1 / -1; }
+.adhoc-field label {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+}
+.adhoc-field input,
+.adhoc-field select {
+  padding: 7px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: .85rem;
+  color: var(--ink);
+  width: 100%;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.adhoc-field input:focus,
+.adhoc-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lt);
+}
+
+/* ── Pending adhoc list (gerar view) ─────────── */
+.adhoc-pending-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.adhoc-pending-header {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--accent-dk);
+  background: var(--accent-lt);
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+}
+.adhoc-pending-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.adhoc-pending-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.adhoc-pending-name { font-size: .88rem; font-weight: 500; }
+.adhoc-pending-meta { font-size: .73rem; color: var(--ink-3); }
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 520px) {
+  .adhoc-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .adhoc-field-name { grid-column: 1 / -1; }
+}

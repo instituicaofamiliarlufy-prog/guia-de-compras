@@ -53,9 +53,17 @@ function openModal(id)  { document.getElementById(id).classList.remove("hidden")
 function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
 
 // ── Resolve item data from catalog ─────────────────
-// listaItem: { catId, itemIdx, qty, checked }
-// Returns merged object with catalog data, or null if not found.
+// listaItem: { catId, itemIdx, qty, checked } OR adhoc { adhoc:true, name, ... }
 function resolveItem(listaItem) {
+  // Ad-hoc items are self-contained — return as-is with shape normalisation
+  if (listaItem.adhoc) {
+    const shop = state.supermercados[listaItem.shopId];
+    return {
+      ...listaItem,
+      shopNome: shop?.nome || listaItem.shopNome || "",
+      shopCor:  shop?.cor  || listaItem.shopCor  || "#888",
+    };
+  }
   const catData = state.catalog[listaItem.catId];
   if (!catData) return null;
   const catalogItem = catData.items[listaItem.itemIdx];
@@ -88,6 +96,36 @@ function generateListaName(dateStr) {
   let n = 2;
   while (names.includes(`${base} #${n}`)) n++;
   return `${base} #${n}`;
+}
+
+// ── Ad-hoc helpers ─────────────────────────────────
+function adhocKey(name) {
+  return `adhoc_${slugify(name)}_${Date.now()}`;
+}
+function buildAdhocItem({ name, qty, unit, preco, shopId, categoria }) {
+  const shop = state.supermercados[shopId];
+  return {
+    adhoc:     true,
+    name:      name.trim(),
+    qty:       parseFloat(qty)   || 1,
+    unit:      unit              || "un",
+    preco:     parseFloat(preco) || 0,
+    checked:   false,
+    categoria: (categoria || "Outros").trim(),
+    shopId:    shopId    || "",
+    shopNome:  shop?.nome || "",
+    shopCor:   shop?.cor  || "#888",
+  };
+}
+function populateAdhocShopSelects() {
+  const shops = Object.entries(state.supermercados)
+    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+  const opts = '<option value="">— Nenhum —</option>' +
+    shops.map(([id, s]) => `<option value="${id}">${s.nome}</option>`).join("");
+  ["adhoc-shop", "adhoc-gerar-shop"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML = opts; }
+  });
 }
 
 // ── Shop distribution (by value) ───────────────────
@@ -302,6 +340,7 @@ function populateCategorySelects() {
 }
 
 function populateShopSelects() {
+  populateAdhocShopSelects();
   const shops = Object.entries(state.supermercados).sort((a, b) => a[1].nome.localeCompare(b[1].nome));
   // Item modal shop select
   const itemShopSel = document.getElementById("item-shop-input");
@@ -699,6 +738,11 @@ async function initGerarView() {
   document.getElementById("gerar-supermercado").value = "";
   document.getElementById("gerar-shop-dist").classList.add("hidden");
   document.getElementById("gerar-budget-preview").classList.add("hidden");
+  // Reset adhoc state
+  state.adhocGerarItems.length = 0;
+  document.getElementById("adhoc-form-gerar").classList.add("hidden");
+  document.getElementById("btn-toggle-adhoc-gerar").classList.remove("open");
+  renderAdhocGerarList();
   renderGerarCatalog();
 }
 
@@ -773,8 +817,15 @@ function renderGerarCatalog() {
 }
 
 function updateGerarCount() {
-  const n = gerarSelections.size;
-  document.getElementById("gerar-count").textContent = `${n} produto${n !== 1 ? "s" : ""} seleccionado${n !== 1 ? "s" : ""}`;
+  const catalogN = gerarSelections.size;
+  const adhocN   = state.adhocGerarItems.length;
+  const n        = catalogN + adhocN;
+  const parts    = [];
+  if (catalogN > 0) parts.push(`${catalogN} do catálogo`);
+  if (adhocN   > 0) parts.push(`${adhocN} ad-hoc`);
+  document.getElementById("gerar-count").textContent = n > 0
+    ? `${n} produto${n !== 1 ? "s" : ""} seleccionado${n !== 1 ? "s" : ""}${parts.length ? ` (${parts.join(", ")})` : ""}`
+    : "0 produtos seleccionados";
   document.getElementById("btn-create-list").disabled = n === 0;
 }
 
@@ -826,7 +877,8 @@ document.getElementById("btn-create-list").addEventListener("click", async () =>
   let   nome    = document.getElementById("gerar-nome").value.trim();
   const superM  = document.getElementById("gerar-supermercado").value.trim();
   if (!dateStr)             return showToast("Seleccione uma data.", "error");
-  if (!gerarSelections.size) return showToast("Seleccione pelo menos um produto.", "error");
+  if (!gerarSelections.size && !state.adhocGerarItems.length)
+    return showToast("Seleccione pelo menos um produto ou adicione um produto ad-hoc.", "error");
   if (!nome) { await loadAllListas(); nome = generateListaName(dateStr); }
 
   const btn = document.getElementById("btn-create-list");
@@ -1449,4 +1501,150 @@ document.getElementById("btn-iti-back").addEventListener("click", () => {
   itiState.mapRendered = false;
   document.getElementById("iti-map-container").classList.add("hidden");
   showItiStep("config");
+});
+
+// ═══════════════════════════════════════════════════
+// AD-HOC PRODUCTS — UI event handlers
+// ═══════════════════════════════════════════════════
+
+// ── Adhoc in modal-add-to-lista (existing lista) ────
+document.getElementById("btn-toggle-adhoc").addEventListener("click", () => {
+  const form    = document.getElementById("adhoc-form");
+  const btn     = document.getElementById("btn-toggle-adhoc");
+  const opening = form.classList.contains("hidden");
+  form.classList.toggle("hidden", !opening);
+  btn.classList.toggle("open", opening);
+  if (opening) { populateAdhocShopSelects(); document.getElementById("adhoc-name").focus(); }
+});
+
+document.getElementById("btn-add-adhoc").addEventListener("click", async () => {
+  const name   = document.getElementById("adhoc-name").value.trim();
+  const qty    = document.getElementById("adhoc-qty").value;
+  const unit   = document.getElementById("adhoc-unit").value;
+  const preco  = document.getElementById("adhoc-preco").value;
+  const shopId = document.getElementById("adhoc-shop").value;
+  const cat    = document.getElementById("adhoc-cat").value;
+
+  if (!name) return showToast("Insira o nome do produto.", "error");
+  if (!state.currentListaId) return showToast("Nenhuma lista activa.", "error");
+
+  const key  = adhocKey(name);
+  const item = buildAdhocItem({ name, qty, unit, preco, shopId, categoria: cat });
+
+  try {
+    const upd = {}; upd[`items.${key}`] = item;
+    await updateDoc(doc(db, "listas", state.currentListaId), upd);
+    showToast(`"${name}" adicionado!`, "success");
+    // Reset fields
+    ["adhoc-name","adhoc-preco","adhoc-cat"].forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("adhoc-qty").value  = "1";
+    document.getElementById("adhoc-shop").value = "";
+    // Collapse
+    document.getElementById("adhoc-form").classList.add("hidden");
+    document.getElementById("btn-toggle-adhoc").classList.remove("open");
+  } catch (e) { console.error(e); showToast("Erro ao adicionar produto.", "error"); }
+});
+
+// ── Adhoc in Gerar view (pending list) ─────────────
+document.getElementById("btn-toggle-adhoc-gerar").addEventListener("click", () => {
+  const form    = document.getElementById("adhoc-form-gerar");
+  const btn     = document.getElementById("btn-toggle-adhoc-gerar");
+  const opening = form.classList.contains("hidden");
+  form.classList.toggle("hidden", !opening);
+  btn.classList.toggle("open", opening);
+  if (opening) { populateAdhocShopSelects(); document.getElementById("adhoc-gerar-name").focus(); }
+});
+
+function addAdhocToGerarList() {
+  const name   = document.getElementById("adhoc-gerar-name").value.trim();
+  const qty    = document.getElementById("adhoc-gerar-qty").value;
+  const unit   = document.getElementById("adhoc-gerar-unit").value;
+  const preco  = document.getElementById("adhoc-gerar-preco").value;
+  const shopId = document.getElementById("adhoc-gerar-shop").value;
+  const cat    = document.getElementById("adhoc-gerar-cat").value;
+
+  if (!name) return showToast("Insira o nome do produto.", "error");
+
+  const key  = adhocKey(name);
+  const item = buildAdhocItem({ name, qty, unit, preco, shopId, categoria: cat });
+  state.adhocGerarItems.push({ key, item });
+
+  // Clear name + price for quick successive adds; keep other fields
+  document.getElementById("adhoc-gerar-name").value  = "";
+  document.getElementById("adhoc-gerar-preco").value = "";
+  document.getElementById("adhoc-gerar-name").focus();
+
+  renderAdhocGerarList();
+  updateGerarCount();
+  updateGerarBudget();
+}
+
+document.getElementById("adhoc-gerar-name").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); addAdhocToGerarList(); }
+});
+
+function renderAdhocGerarList() {
+  const container = document.getElementById("adhoc-gerar-list");
+  container.innerHTML = "";
+  if (!state.adhocGerarItems.length) return;
+
+  const header = document.createElement("div");
+  header.className = "adhoc-pending-header";
+  header.textContent = `${state.adhocGerarItems.length} produto(s) ad-hoc adicionado(s)`;
+  container.appendChild(header);
+
+  state.adhocGerarItems.forEach(({ key, item }, idx) => {
+    const shop = state.supermercados[item.shopId];
+    const row  = document.createElement("div");
+    row.className = "adhoc-pending-row";
+    row.innerHTML = `
+      <div class="adhoc-pending-info">
+        <span class="adhoc-pending-name">${item.name}</span>
+        <span class="adhoc-pending-meta">
+          ${item.qty} ${item.unit}
+          ${item.preco ? ` · Kz ${Math.round(item.preco).toLocaleString("pt-AO")}` : ""}
+          ${shop ? ` · <span style="color:${shop.cor};font-weight:600">${shop.nome}</span>` : ""}
+          ${item.categoria !== "Outros" ? ` · ${item.categoria}` : ""}
+        </span>
+      </div>
+      <button class="btn-icon danger" title="Remover" data-idx="${idx}">✕</button>`;
+    row.querySelector(".btn-icon").addEventListener("click", () => {
+      state.adhocGerarItems.splice(idx, 1);
+      renderAdhocGerarList();
+      updateGerarCount();
+      updateGerarBudget();
+    });
+    container.appendChild(row);
+  });
+
+  // Add button below the fields (injected once)
+  if (!document.getElementById("btn-adhoc-gerar-add")) {
+    const addBtn     = document.createElement("button");
+    addBtn.id        = "btn-adhoc-gerar-add";
+    addBtn.className = "btn-secondary";
+    addBtn.style.cssText = "width:100%;margin-top:8px";
+    addBtn.textContent   = "＋ Adicionar este produto";
+    addBtn.addEventListener("click", addAdhocToGerarList);
+    document.getElementById("adhoc-form-gerar").insertBefore(
+      addBtn,
+      document.getElementById("adhoc-gerar-list")
+    );
+  }
+}
+
+// Inject the add button the first time the form opens (before any items exist)
+document.getElementById("btn-toggle-adhoc-gerar").addEventListener("click", function inject() {
+  if (!document.getElementById("btn-adhoc-gerar-add")) {
+    const addBtn     = document.createElement("button");
+    addBtn.id        = "btn-adhoc-gerar-add";
+    addBtn.className = "btn-secondary";
+    addBtn.style.cssText = "width:100%;margin-top:8px";
+    addBtn.textContent   = "＋ Adicionar este produto";
+    addBtn.addEventListener("click", addAdhocToGerarList);
+    document.getElementById("adhoc-form-gerar").insertBefore(
+      addBtn,
+      document.getElementById("adhoc-gerar-list")
+    );
+  }
+  this.removeEventListener("click", inject);
 });
