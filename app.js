@@ -699,6 +699,17 @@ async function initGerarView() {
   document.getElementById("gerar-supermercado").value = "";
   document.getElementById("gerar-shop-dist").classList.add("hidden");
   document.getElementById("gerar-budget-preview").classList.add("hidden");
+  // Reset novo-produto tab state
+  if (typeof gerarNovosItems !== "undefined") {
+    gerarNovosItems.length = 0;
+    const novosList = document.getElementById("gerar-novos-list");
+    if (novosList) novosList.innerHTML = "";
+  }
+  // Reset to catalog tab
+  document.querySelectorAll(".gerar-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "catalogo"));
+  document.querySelectorAll(".gerar-tab-panel").forEach(p => p.classList.add("hidden"));
+  const catPanel = document.getElementById("gerar-tab-catalogo");
+  if (catPanel) catPanel.classList.remove("hidden");
   renderGerarCatalog();
 }
 
@@ -773,20 +784,34 @@ function renderGerarCatalog() {
 }
 
 function updateGerarCount() {
-  const n = gerarSelections.size;
-  document.getElementById("gerar-count").textContent = `${n} produto${n !== 1 ? "s" : ""} seleccionado${n !== 1 ? "s" : ""}`;
+  const catalogN = gerarSelections.size;
+  const novosN   = typeof gerarNovosItems !== "undefined" ? gerarNovosItems.length : 0;
+  const n        = catalogN + novosN;
+  const parts    = [];
+  if (catalogN > 0) parts.push(`${catalogN} do catálogo`);
+  if (novosN   > 0) parts.push(`${novosN} novo${novosN !== 1 ? "s" : ""}`);
+  document.getElementById("gerar-count").textContent = n > 0
+    ? `${n} produto${n !== 1 ? "s" : ""} (${parts.join(" + ")})`
+    : "0 produtos seleccionados";
   document.getElementById("btn-create-list").disabled = n === 0;
 }
 
 function updateGerarBudget() {
-  const preview = document.getElementById("gerar-budget-preview");
-  if (!gerarSelections.size) { preview.classList.add("hidden"); return; }
+  const preview  = document.getElementById("gerar-budget-preview");
+  const novosN   = typeof gerarNovosItems !== "undefined" ? gerarNovosItems.length : 0;
+  if (!gerarSelections.size && !novosN) { preview.classList.add("hidden"); return; }
   let total = 0;
   gerarSelections.forEach(key => {
     const [catId, idxStr] = key.split("|");
     const item = state.catalog[catId]?.items[parseInt(idxStr)];
     if (item) total += (item.preco || 0) * (item.defaultQty || 1);
   });
+  if (typeof gerarNovosItems !== "undefined") {
+    gerarNovosItems.forEach(({ catId, itemIdx }) => {
+      const item = state.catalog[catId]?.items[itemIdx];
+      if (item) total += (item.preco || 0) * (item.defaultQty || 1);
+    });
+  }
   document.getElementById("gerar-budget-total").textContent = fmtKz(total);
   preview.classList.remove("hidden");
 }
@@ -1472,19 +1497,8 @@ document.querySelectorAll(".add-modal-tab").forEach(tab => {
 
 // ── Populate selects for "novo produto" tab ─────────
 function populateNovoProdutoSelects() {
-  // Shop select
-  const shops = Object.entries(state.supermercados)
-    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
-  document.getElementById("novo-shop").innerHTML =
-    '<option value="">— Nenhum —</option>' +
-    shops.map(([id, s]) => `<option value="${id}">${s.nome}</option>`).join("");
-
-  // Category select
-  const cats = Object.entries(state.catalog)
-    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
-  document.getElementById("novo-cat-select").innerHTML =
-    '<option value="">— Seleccionar categoria —</option>' +
-    cats.map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join("");
+  refreshAllNovoProdutoShopSelects();
+  refreshAllNovoProdutoCatSelects();
 }
 
 // ── "+ Nova" category inline creation ──────────────
@@ -1603,4 +1617,286 @@ document.getElementById("btn-add-to-lista").addEventListener("click", () => {
   document.querySelectorAll(".add-modal-panel").forEach(p => p.classList.add("hidden"));
   document.getElementById("add-tab-catalog").classList.remove("hidden");
   // (catalog list rendering is already handled by the existing btn-add-to-lista listener above)
+});
+
+// ═══════════════════════════════════════════════════
+// GERAR VIEW — NOVO PRODUTO TAB
+// ═══════════════════════════════════════════════════
+
+// ── Shared helper: create supermercado inline ───────
+async function createShopInline(nameInputId, colorInputId, wrapId, shopSelectId) {
+  const name  = document.getElementById(nameInputId).value.trim();
+  const cor   = document.getElementById(colorInputId).value;
+  if (!name) return showToast("Insira o nome do supermercado.", "error");
+  const id = slugify(name);
+  if (state.supermercados[id]) {
+    document.getElementById(shopSelectId).value = id;
+    document.getElementById(wrapId).classList.add("hidden");
+    document.getElementById(nameInputId).value = "";
+    return showToast(`Supermercado "${name}" já existe — seleccionado.`, "success");
+  }
+  try {
+    await saveSupermercado(id, { nome: name, cor });
+    await loadSupermercados();
+    populateShopSelects();
+    refreshAllNovoProdutoShopSelects();
+    document.getElementById(shopSelectId).value = id;
+    document.getElementById(wrapId).classList.add("hidden");
+    document.getElementById(nameInputId).value = "";
+    showToast(`Supermercado "${name}" criado!`, "success");
+  } catch (e) { console.error(e); showToast("Erro ao criar supermercado.", "error"); }
+}
+
+// ── Shared helper: create category inline ───────────
+async function createCatInline(inputId, wrapId, catSelectId) {
+  const name = document.getElementById(inputId).value.trim();
+  if (!name) return showToast("Insira o nome da categoria.", "error");
+  const catId = slugify(name);
+  if (state.catalog[catId]) {
+    document.getElementById(catSelectId).value = catId;
+    document.getElementById(wrapId).classList.add("hidden");
+    document.getElementById(inputId).value = "";
+    return showToast(`Categoria "${name}" já existe — seleccionada.`, "success");
+  }
+  try {
+    await saveCategoryToFirestore(catId, { nome: name, items: [] });
+    await loadCatalog();
+    populateCategorySelects();
+    refreshAllNovoProdutoCatSelects();
+    document.getElementById(catSelectId).value = catId;
+    document.getElementById(wrapId).classList.add("hidden");
+    document.getElementById(inputId).value = "";
+    showToast(`Categoria "${name}" criada!`, "success");
+  } catch (e) { console.error(e); showToast("Erro ao criar categoria.", "error"); }
+}
+
+// ── Refresh all "novo produto" selects across contexts ──
+function refreshAllNovoProdutoShopSelects() {
+  const shops = Object.entries(state.supermercados)
+    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+  const opts = '<option value="">— Nenhum —</option>' +
+    shops.map(([id, s]) => `<option value="${id}">${s.nome}</option>`).join("");
+  ["novo-shop", "gerar-novo-shop"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { const v = el.value; el.innerHTML = opts; el.value = v; }
+  });
+}
+function refreshAllNovoProdutoCatSelects() {
+  const cats = Object.entries(state.catalog)
+    .sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+  const opts = '<option value="">— Seleccionar categoria —</option>' +
+    cats.map(([id, c]) => `<option value="${id}">${c.nome}</option>`).join("");
+  ["novo-cat-select", "gerar-novo-cat"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { const v = el.value; el.innerHTML = opts.replace('— Seleccionar categoria —', id === 'gerar-novo-cat' ? '— Seleccionar —' : '— Seleccionar categoria —'); el.value = v; }
+  });
+}
+
+// ── Gerar tab switching ─────────────────────────────
+document.querySelectorAll(".gerar-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".gerar-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".gerar-tab-panel").forEach(p => p.classList.add("hidden"));
+    tab.classList.add("active");
+    document.getElementById(`gerar-tab-${tab.dataset.tab}`).classList.remove("hidden");
+    if (tab.dataset.tab === "novo") {
+      refreshAllNovoProdutoShopSelects();
+      refreshAllNovoProdutoCatSelects();
+      document.getElementById("gerar-novo-name").focus();
+    }
+  });
+});
+
+// ── Gerar: new shop inline ──────────────────────────
+document.getElementById("btn-gerar-novo-shop-new").addEventListener("click", () => {
+  document.getElementById("gerar-novo-shop-wrap").classList.toggle("hidden");
+  document.getElementById("gerar-novo-shop-name").focus();
+});
+document.getElementById("btn-gerar-novo-shop-create").addEventListener("click", () =>
+  createShopInline("gerar-novo-shop-name", "gerar-novo-shop-color", "gerar-novo-shop-wrap", "gerar-novo-shop")
+);
+document.getElementById("gerar-novo-shop-name").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-gerar-novo-shop-create").click(); }
+});
+
+// ── Gerar: new category inline ──────────────────────
+document.getElementById("btn-gerar-novo-cat-new").addEventListener("click", () => {
+  document.getElementById("gerar-novo-cat-wrap").classList.toggle("hidden");
+  document.getElementById("gerar-novo-cat-input").focus();
+});
+document.getElementById("btn-gerar-novo-cat-create").addEventListener("click", () =>
+  createCatInline("gerar-novo-cat-input", "gerar-novo-cat-wrap", "gerar-novo-cat")
+);
+document.getElementById("gerar-novo-cat-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-gerar-novo-cat-create").click(); }
+});
+
+// ── Gerar: pending new products list ───────────────
+const gerarNovosItems = []; // [{ catId, itemIdx, displayName }]
+
+function renderGerarNovosList() {
+  const container = document.getElementById("gerar-novos-list");
+  container.innerHTML = "";
+  if (!gerarNovosItems.length) return;
+
+  const header = document.createElement("div");
+  header.className = "adhoc-pending-header";
+  header.textContent = `${gerarNovosItems.length} produto(s) novo(s) adicionado(s)`;
+  container.appendChild(header);
+
+  gerarNovosItems.forEach(({ catId, itemIdx, displayName }, idx) => {
+    const catData = state.catalog[catId];
+    const item    = catData?.items[itemIdx];
+    const shop    = item ? state.supermercados[item.bestShopId] : null;
+    const row = document.createElement("div");
+    row.className = "adhoc-pending-row";
+    row.innerHTML = `
+      <div class="adhoc-pending-info">
+        <span class="adhoc-pending-name">${displayName}</span>
+        ${item ? `<span class="adhoc-pending-meta">${item.defaultQty} ${item.unit}${item.preco ? ` · Kz ${Math.round(item.preco).toLocaleString("pt-AO")}` : ""}${shop ? ` · <span style="color:${shop.cor};font-weight:600">${shop.nome}</span>` : ""}</span>` : ""}
+      </div>
+      <button class="btn-icon danger" data-idx="${idx}" title="Remover">✕</button>`;
+    row.querySelector(".btn-icon").addEventListener("click", () => {
+      gerarNovosItems.splice(idx, 1);
+      renderGerarNovosList();
+      updateGerarCount();
+    });
+    container.appendChild(row);
+  });
+}
+
+// ── Gerar: add novo product button ─────────────────
+document.getElementById("btn-gerar-novo-add").addEventListener("click", async () => {
+  const name   = document.getElementById("gerar-novo-name").value.trim();
+  const qty    = parseFloat(document.getElementById("gerar-novo-qty").value)   || 1;
+  const unit   = document.getElementById("gerar-novo-unit").value;
+  const preco  = parseFloat(document.getElementById("gerar-novo-preco").value) || 0;
+  const shopId = document.getElementById("gerar-novo-shop").value;
+  const catId  = document.getElementById("gerar-novo-cat").value;
+
+  if (!name)  return showToast("Insira o nome do produto.", "error");
+  if (!catId) return showToast("Seleccione ou crie uma categoria.", "error");
+
+  const btn = document.getElementById("btn-gerar-novo-add");
+  btn.disabled = true; btn.textContent = "A guardar…";
+
+  try {
+    // Save to catalog
+    const catData   = state.catalog[catId] || { nome: catId, items: [] };
+    const newItem   = { name, defaultQty: qty, unit, preco, bestShopId: shopId };
+    const dupIdx    = catData.items.findIndex(i => slugify(i.name) === slugify(name));
+    let itemIdx;
+    if (dupIdx >= 0) {
+      catData.items[dupIdx] = newItem; itemIdx = dupIdx;
+    } else {
+      catData.items.push(newItem); itemIdx = catData.items.length - 1;
+    }
+    await saveCategoryToFirestore(catId, catData);
+    await loadCatalog();
+    refreshAllNovoProdutoCatSelects();
+
+    // Track for inclusion when lista is created
+    gerarNovosItems.push({ catId, itemIdx, displayName: name });
+    renderGerarNovosList();
+    updateGerarCount();
+    updateGerarBudget();
+
+    showToast(`"${name}" adicionado ao catálogo!`, "success");
+
+    // Reset fields (keep category & shop for quick successive adds)
+    document.getElementById("gerar-novo-name").value  = "";
+    document.getElementById("gerar-novo-preco").value = "";
+    document.getElementById("gerar-novo-qty").value   = "1";
+    document.getElementById("gerar-novo-name").focus();
+
+  } catch (e) {
+    console.error(e); showToast("Erro ao guardar produto.", "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "＋ Adicionar produto à lista";
+  }
+});
+
+// Enter key on name field
+document.getElementById("gerar-novo-name").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-gerar-novo-add").click(); }
+});
+
+// ── Patch btn-create-list to include gerarNovosItems ─
+// We need to include gerarNovosItems in the lista creation.
+// Intercept by cloning the button and re-wiring.
+(function patchCreateListBtn() {
+  const oldBtn = document.getElementById("btn-create-list");
+  const newBtn = oldBtn.cloneNode(true);
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+  newBtn.addEventListener("click", async () => {
+    const dateStr = document.getElementById("gerar-date").value;
+    let   nome    = document.getElementById("gerar-nome").value.trim();
+    const superM  = document.getElementById("gerar-supermercado").value.trim();
+
+    if (!dateStr) return showToast("Seleccione uma data.", "error");
+    if (!gerarSelections.size && !gerarNovosItems.length)
+      return showToast("Seleccione ou adicione pelo menos um produto.", "error");
+
+    if (!nome) { await loadAllListas(); nome = generateListaName(dateStr); }
+
+    newBtn.disabled = true;
+    newBtn.querySelector("span").textContent = "A criar…";
+    try {
+      const items = {};
+
+      // Catalog selections (references)
+      gerarSelections.forEach(key => {
+        const [catId, idxStr] = key.split("|");
+        const idx     = parseInt(idxStr);
+        const catData = state.catalog[catId]; if (!catData) return;
+        const item    = catData.items[idx];   if (!item)    return;
+        const k       = itemKey(catId, idx);
+        items[k]      = { catId, itemIdx: idx, qty: item.defaultQty, checked: false };
+      });
+
+      // Newly created products (also references, now in catalog)
+      gerarNovosItems.forEach(({ catId, itemIdx }) => {
+        const k  = itemKey(catId, itemIdx);
+        const it = state.catalog[catId]?.items[itemIdx];
+        if (it) items[k] = { catId, itemIdx, qty: it.defaultQty, checked: false };
+      });
+
+      const listaId = await saveNewLista({ date: dateStr, nome, supermercado: superM, items });
+
+      // Clean up
+      gerarNovosItems.length = 0;
+      renderGerarNovosList();
+
+      showToast(`Lista "${nome}" criada!`, "success");
+      setTimeout(() => switchView("lista", listaId), 700);
+    } catch (e) {
+      console.error(e); showToast("Erro ao criar lista.", "error");
+      newBtn.disabled = false;
+      newBtn.querySelector("span").textContent = "Criar Lista";
+    }
+  });
+})();
+
+// ── Patch updateGerarCount for gerarNovosItems ──────
+// Override the existing function by re-declaring in this scope
+{
+  const _orig = updateGerarCount;
+  
+}
+
+// ── Also clean gerarNovosItems on initGerarView ─────
+
+// ═══════════════════════════════════════════════════
+// MODAL ADD-TO-LISTA — new shop inline (modal context)
+// ═══════════════════════════════════════════════════
+document.getElementById("btn-novo-shop-new").addEventListener("click", () => {
+  document.getElementById("novo-shop-wrap").classList.toggle("hidden");
+  document.getElementById("novo-shop-name").focus();
+});
+document.getElementById("btn-novo-shop-create").addEventListener("click", () =>
+  createShopInline("novo-shop-name", "novo-shop-color", "novo-shop-wrap", "novo-shop")
+);
+document.getElementById("novo-shop-name").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-novo-shop-create").click(); }
 });

@@ -125,7 +125,80 @@
           <input type="checkbox" id="gerar-select-all"/>Seleccionar tudo
         </label>
       </div>
-      <div id="gerar-catalog" class="gerar-catalog"></div>
+      <!-- Gerar inner tabs -->
+      <div class="gerar-tabs">
+        <button class="gerar-tab active" data-tab="catalogo">📦 Do catálogo</button>
+        <button class="gerar-tab" data-tab="novo">✨ Novo produto</button>
+      </div>
+
+      <!-- Tab: catálogo -->
+      <div id="gerar-tab-catalogo" class="gerar-tab-panel">
+        <div id="gerar-catalog" class="gerar-catalog"></div>
+      </div>
+
+      <!-- Tab: novo produto -->
+      <div id="gerar-tab-novo" class="gerar-tab-panel hidden">
+        <div class="novo-produto-form" style="overflow:visible;padding:0;gap:8px">
+          <div class="novo-row">
+            <div class="novo-field novo-field-full">
+              <label>Nome do produto *</label>
+              <input type="text" id="gerar-novo-name" placeholder="Ex: Leite de coco 400ml"/>
+            </div>
+          </div>
+          <div class="novo-row">
+            <div class="novo-field">
+              <label>Quantidade</label>
+              <input type="number" id="gerar-novo-qty" value="1" min="0.01" step="0.01"/>
+            </div>
+            <div class="novo-field">
+              <label>Unidade</label>
+              <select id="gerar-novo-unit">
+                <option value="un">un</option><option value="kg">kg</option>
+                <option value="g">g</option><option value="L">L</option>
+                <option value="ml">ml</option><option value="cx">cx</option>
+                <option value="pack">pack</option><option value="dz">dz</option>
+              </select>
+            </div>
+            <div class="novo-field">
+              <label>Preço (Kz)</label>
+              <input type="number" id="gerar-novo-preco" placeholder="0" min="0" step="1"/>
+            </div>
+          </div>
+          <div class="novo-row">
+            <div class="novo-field novo-field-full">
+              <label>Supermercado sugerido</label>
+              <div class="novo-cat-row">
+                <select id="gerar-novo-shop"><option value="">— Nenhum —</option></select>
+                <button id="btn-gerar-novo-shop-new" class="btn-secondary btn-sm">+ Novo</button>
+              </div>
+              <div id="gerar-novo-shop-wrap" class="novo-new-cat-wrap hidden">
+                <input type="text" id="gerar-novo-shop-name" placeholder="Nome…"/>
+                <input type="color" id="gerar-novo-shop-color" value="#2D6A4F" class="color-input-sm"/>
+                <button id="btn-gerar-novo-shop-create" class="btn-primary btn-sm">Criar</button>
+              </div>
+            </div>
+          </div>
+          <div class="novo-row">
+            <div class="novo-field novo-field-full">
+              <label>Categoria *</label>
+              <div class="novo-cat-row">
+                <select id="gerar-novo-cat"><option value="">— Seleccionar —</option></select>
+                <button id="btn-gerar-novo-cat-new" class="btn-secondary btn-sm">+ Nova</button>
+              </div>
+              <div id="gerar-novo-cat-wrap" class="novo-new-cat-wrap hidden">
+                <input type="text" id="gerar-novo-cat-input" placeholder="Nome da nova categoria…"/>
+                <button id="btn-gerar-novo-cat-create" class="btn-primary btn-sm">Criar</button>
+              </div>
+            </div>
+          </div>
+          <p class="novo-hint" style="margin:0">💡 O produto fica guardado no catálogo e adicionado à lista.</p>
+          <div id="gerar-novos-list" class="gerar-novos-list"></div>
+          <button id="btn-gerar-novo-add" class="btn-primary" style="width:100%">
+            ＋ Adicionar produto à lista
+          </button>
+        </div>
+      </div>
+
       <div class="gerar-footer">
         <span id="gerar-count" class="gerar-count">0 produtos seleccionados</span>
         <button id="btn-create-list" class="btn-primary" disabled>
@@ -262,7 +335,15 @@
           <div class="novo-row">
             <div class="novo-field novo-field-full">
               <label>Supermercado sugerido</label>
-              <select id="novo-shop"><option value="">— Nenhum —</option></select>
+              <div class="novo-cat-row">
+                <select id="novo-shop"><option value="">— Nenhum —</option></select>
+                <button id="btn-novo-shop-new" class="btn-secondary btn-sm">+ Novo</button>
+              </div>
+              <div id="novo-shop-wrap" class="novo-new-cat-wrap hidden">
+                <input type="text" id="novo-shop-name" placeholder="Nome…"/>
+                <input type="color" id="novo-shop-color" value="#2D6A4F" class="color-input-sm"/>
+                <button id="btn-novo-shop-create" class="btn-primary btn-sm">Criar</button>
+              </div>
             </div>
           </div>
           <div class="novo-row">

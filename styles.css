@@ -1760,3 +1760,83 @@ input[type="color"] {
   .novo-field { flex: 0 0 calc(50% - 4px); }
   .novo-field-full { flex: 0 0 100%; }
 }
+
+/* ═══════════════════════════════════════════
+   GERAR VIEW — NOVO PRODUTO TAB
+═══════════════════════════════════════════ */
+
+.gerar-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border-soft);
+  margin-bottom: 16px;
+}
+.gerar-tab {
+  font-family: 'Syne', sans-serif;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 9px 18px;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  background: none;
+  transition: color var(--transition), border-color var(--transition);
+}
+.gerar-tab:hover  { color: var(--ink); }
+.gerar-tab.active { color: var(--accent-dk); border-bottom-color: var(--accent); }
+.gerar-tab-panel.hidden { display: none; }
+
+/* Pending novos list in gerar view */
+.gerar-novos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+}
+.gerar-novos-list .adhoc-pending-header {
+  display: flex;
+}
+
+/* Compact color input */
+.color-input-sm {
+  width: 38px;
+  height: 36px;
+  padding: 2px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+/* Override: hide old adhoc CSS rules that suppress display */
+.adhoc-section, .adhoc-toggle-btn, .adhoc-form,
+.adhoc-pending-list, .adhoc-pending-row {
+  display: revert !important;
+}
+/* But keep adhoc pending rows styled */
+.adhoc-pending-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.adhoc-pending-header {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--accent-dk);
+  background: var(--accent-lt);
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+}
+.adhoc-pending-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.adhoc-pending-name { font-size: .88rem; font-weight: 500; }
+.adhoc-pending-meta { font-size: .73rem; color: var(--ink-3); }
