@@ -73,6 +73,28 @@
     ::-webkit-scrollbar{width:5px;}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:100px;}
 
+    /* Default itinerary banner */
+    .iti-default-banner{margin-bottom:14px;}
+    .iti-default-banner-inner{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:0 2px 8px rgba(26,23,20,.06);}
+    .iti-default-banner-inner.loading{display:flex;align-items:center;gap:10px;color:var(--ink-3);font-size:.85rem;}
+    .iti-default-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+    .iti-def-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;}
+    .iti-def-title{font-family:"Syne",sans-serif;font-size:.9rem;font-weight:700;color:var(--ink);}
+    .iti-def-origin{font-size:.78rem;color:var(--ink-3);}
+    .iti-def-stats{display:flex;gap:12px;font-size:.75rem;color:var(--ink-3);margin-left:auto;}
+    .iti-def-stops{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px;}
+    .iti-def-stop{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;background:color-mix(in srgb,var(--stop-cor) 12%,transparent);color:var(--stop-cor);padding:3px 10px;border-radius:100px;border:1px solid color-mix(in srgb,var(--stop-cor) 25%,transparent);}
+    .iti-def-num{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;color:#fff;flex-shrink:0;}
+    .iti-def-arrow{color:var(--ink-3);font-size:.75rem;}
+    .iti-def-actions{display:flex;gap:8px;}
+    .iti-def-btn-map{flex:1;padding:7px;border:1.5px solid var(--accent);border-radius:8px;background:var(--accent-lt);color:var(--accent-dk);font-family:"Syne",sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .15s;}
+    .iti-def-btn-map:hover{background:var(--accent);color:#fff;}
+    .iti-def-btn-custom{flex:1;padding:7px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink-3);font-family:"Syne",sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:background .15s;}
+    .iti-def-btn-custom:hover{background:var(--surface-2);color:var(--ink);}
+    .iti-default-map-wrap{margin-top:10px;border-radius:12px;overflow:hidden;border:1px solid var(--border-soft);}
+    .iti-default-map-wrap.hidden{display:none;}
+    .iti-default-map{width:100%;height:240px;}
+
     /* Itinerary button */
     .v-iti-btn{width:100%;padding:10px 16px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius);font-family:"Syne",sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:2px;transition:background .18s;}
     .v-iti-btn:hover{background:var(--accent-dk);}
@@ -180,6 +202,7 @@
   <main class="viewer-main">
     <div id="v-loading" class="loading-state"><div class="spinner"></div><p>A carregar lista…</p></div>
     <div id="v-error" class="empty-state hidden"><div class="empty-icon">⚠️</div><p id="v-error-msg">Lista não encontrada.</p></div>
+    <div id="v-default-banner"></div>
     <div id="v-content"></div>
   </main>
 
@@ -444,6 +467,11 @@ if (!listaId) {
     else sb.classList.add("hidden");
     populateShopFilter(data);
     render(data);
+    // Compute default itinerary once on first load
+    if (!vDefaultIti.computed && catalog && Object.keys(catalog).length) {
+      vDefaultIti.computed = true;
+      computeViewerDefaultIti(data);
+    }
   });
 }
 
@@ -452,6 +480,91 @@ if (!listaId) {
     if (currentLista) render(currentLista);
   });
 });
+
+// ── Default itinerary for viewer ──────────────────
+const vDefaultIti = { computed: false, result: null, mapRendered: false };
+const VIEWER_PLACES_KEY = "AIzaSyBKLXfozJI7nvryAipKBV5o__2wX16afCI";
+
+async function resolveViewerShopCoords(shopName) {
+  try {
+    const resp = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: { "Content-Type":"application/json","X-Goog-Api-Key":VIEWER_PLACES_KEY,"X-Goog-FieldMask":"places.location" },
+      body: JSON.stringify({ textQuery:`${shopName} Luanda Angola`, languageCode:"pt", maxResultCount:1,
+        locationBias:{ circle:{ center:{latitude:-8.836,longitude:13.234}, radius:30000 } } })
+    });
+    const data = await resp.json();
+    const p = data.places?.[0];
+    return p ? { lat: p.location.latitude, lng: p.location.longitude } : null;
+  } catch(e) { return null; }
+}
+
+function getViewerUniqueShops(lista) {
+  const seen = new Set(), shops = [];
+  Object.values(lista.items||{}).forEach(li => {
+    const r = resolveItem(li); if (!r?.shopId) return;
+    if (seen.has(r.shopId)) return; seen.add(r.shopId);
+    const shop = supermercados[r.shopId];
+    shops.push({ shopId:r.shopId, shopName:shop?.nome||r.shopId, cor:shop?.cor||"#888" });
+  });
+  return shops;
+}
+
+async function computeViewerDefaultIti(lista) {
+  const shops = getViewerUniqueShops(lista);
+  if (!shops.length) return;
+  const bannerEl = document.getElementById("v-default-banner");
+  bannerEl.innerHTML = `<div class="iti-default-banner"><div class="iti-default-banner-inner loading"><div class="iti-default-spinner"></div><span>A calcular itinerário sugerido…</span></div></div>`;
+  try {
+    let origin = { lat:-8.836, lng:13.234 };
+    const suggested = lista.supermercado?.trim();
+    if (suggested) { const c = await resolveViewerShopCoords(suggested); if(c) origin=c; }
+    if (shops.length===1 && suggested && shops[0].shopName.toLowerCase()===suggested.toLowerCase()) { bannerEl.innerHTML=""; return; }
+    const result = await buildItinerary({ shops, origin, returnToOrigin:false, onStatus:()=>{} });
+    vDefaultIti.result = result;
+    renderViewerDefaultBanner(bannerEl, result, suggested||"Luanda");
+  } catch(e) { console.warn("Viewer default iti failed:", e.message); bannerEl.innerHTML=""; }
+}
+
+function renderViewerDefaultBanner(bannerEl, result, originLabel) {
+  function fmtDur(s){ const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}min`:`${m} min`; }
+  function fmtDist(m){ return m>=1000?`${(m/1000).toFixed(1)} km`:`${m} m`; }
+  const stopsHtml = result.stops.map((s,i)=>{
+    const shop = Object.values(supermercados).find(sh=>sh.nome.toLowerCase()===s.shopName.toLowerCase());
+    const cor = shop?.cor||"#2D6A4F";
+    return `<span class="iti-def-stop" style="--stop-cor:${cor}"><span class="iti-def-num" style="background:${cor}">${i+1}</span>${s.shopName}</span>`;
+  }).join('<span class="iti-def-arrow">→</span>');
+  bannerEl.innerHTML = `<div class="iti-default-banner"><div class="iti-default-banner-inner">
+    <div class="iti-def-top">
+      <span class="iti-def-title">🗺️ Itinerário sugerido</span>
+      <span class="iti-def-origin">a partir de <strong>${originLabel}</strong></span>
+      <div class="iti-def-stats"><span>⏱ ${fmtDur(result.totalDuration)}</span><span>📍 ${fmtDist(result.totalDistance)}</span><span>🏪 ${result.stops.length} paragem${result.stops.length!==1?"s":""}</span></div>
+    </div>
+    <div class="iti-def-stops">${stopsHtml}</div>
+    <div class="iti-def-actions">
+      <button id="v-def-map-btn" class="iti-def-btn-map">Ver no mapa</button>
+      <button id="v-def-custom-btn" class="iti-def-btn-custom">Personalizar</button>
+    </div>
+    <div id="v-def-map-wrap" class="iti-default-map-wrap hidden"><div id="v-def-map" class="iti-default-map"></div></div>
+  </div></div>`;
+
+  document.getElementById("v-def-map-btn").addEventListener("click", async () => {
+    const wrap = document.getElementById("v-def-map-wrap");
+    const btn  = document.getElementById("v-def-map-btn");
+    if (wrap.classList.contains("hidden")) {
+      wrap.classList.remove("hidden"); btn.textContent="Ocultar mapa";
+      if (!vDefaultIti.mapRendered) {
+        btn.textContent="A carregar…";
+        try { await renderMap("v-def-map", vDefaultIti.result, supermercados); vDefaultIti.mapRendered=true; btn.textContent="Ocultar mapa"; }
+        catch(e){ btn.textContent="Erro"; }
+      }
+    } else { wrap.classList.add("hidden"); btn.textContent="Ver no mapa"; }
+  });
+  document.getElementById("v-def-custom-btn").addEventListener("click", () => {
+    if (vDefaultIti.result) vIti.originLatLng = vDefaultIti.result.origin;
+    document.getElementById("v-btn-itinerario").click();
+  });
+}
 
 // ══════════════════════════════════════════
 // ITINERÁRIO INTELIGENTE — viewer
@@ -536,15 +649,26 @@ document.querySelectorAll("#v-modal-itinerario .iti-origin-tab").forEach(tab => 
   });
 });
 
-// GPS
-document.getElementById("v-btn-gps").addEventListener("click", () => {
+// GPS — iOS-safe: call getCurrentPosition synchronously in click handler (no awaits before)
+document.getElementById("v-btn-gps").addEventListener("click", function() {
   const st = document.getElementById("v-gps-status");
   if (!navigator.geolocation) { st.textContent = "⚠️ Geolocalização não suportada."; st.className = "iti-status-line error"; return; }
   st.textContent = "A obter localização…"; st.className = "iti-status-line";
   navigator.geolocation.getCurrentPosition(
-    pos => { vIti.originLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude }; st.textContent = `✅ ${vIti.originLatLng.lat.toFixed(4)}, ${vIti.originLatLng.lng.toFixed(4)}`; st.className = "iti-status-line success"; },
-    err => { st.textContent = `⚠️ ${err.message}`; st.className = "iti-status-line error"; },
-    { enableHighAccuracy: true, timeout: 10000 }
+    function(pos) {
+      vIti.originLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      st.textContent = "✅ " + vIti.originLatLng.lat.toFixed(4) + ", " + vIti.originLatLng.lng.toFixed(4);
+      st.className = "iti-status-line success";
+    },
+    function(err) {
+      let msg = err.message;
+      if (err.code === 1) msg = "Acesso negado. Active em Definições > Safari > Localização.";
+      if (err.code === 2) msg = "Posição indisponível. Verifique o GPS.";
+      if (err.code === 3) msg = "Tempo esgotado. Tente novamente.";
+      st.textContent = "⚠️ " + msg;
+      st.className = "iti-status-line error";
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
   );
 });
 

@@ -1840,3 +1840,125 @@ input[type="color"] {
 .adhoc-pending-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .adhoc-pending-name { font-size: .88rem; font-weight: 500; }
 .adhoc-pending-meta { font-size: .73rem; color: var(--ink-3); }
+
+/* ═══════════════════════════════════════════
+   DEFAULT ITINERARY BANNER (admin view)
+═══════════════════════════════════════════ */
+.iti-default-banner { margin-bottom: 16px; }
+.iti-default-banner-inner {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.iti-default-banner-inner.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-3);
+  font-size: .85rem;
+}
+.iti-default-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+.iti-def-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.iti-def-title {
+  font-family: 'Syne', sans-serif;
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.iti-def-origin { font-size: .78rem; color: var(--ink-3); }
+.iti-def-stats {
+  display: flex;
+  gap: 12px;
+  font-size: .75rem;
+  color: var(--ink-3);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.iti-def-stops {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.iti-def-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .78rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--stop-cor) 12%, transparent);
+  color: var(--stop-cor);
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid color-mix(in srgb, var(--stop-cor) 25%, transparent);
+}
+.iti-def-num {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .65rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.iti-def-arrow { color: var(--ink-3); font-size: .75rem; }
+.iti-def-actions { display: flex; gap: 8px; }
+.iti-def-btn-map {
+  flex: 1;
+  padding: 8px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-lt);
+  color: var(--accent-dk);
+  font-family: 'Syne', sans-serif;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.iti-def-btn-map:hover { background: var(--accent); color: #fff; }
+.iti-def-btn-custom {
+  flex: 1;
+  padding: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-family: 'Syne', sans-serif;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.iti-def-btn-custom:hover { background: var(--surface-2); color: var(--ink); }
+.iti-default-map-wrap {
+  margin-top: 10px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+}
+.iti-default-map-wrap.hidden { display: none; }
+.iti-default-map { width: 100%; height: 280px; }
+
+@media (max-width: 600px) {
+  .iti-def-stats { gap: 8px; }
+  .iti-def-top { gap: 6px; }
+}

@@ -422,6 +422,11 @@ async function initListaView(listaId) {
   if (!listaId) { switchView("listas"); return; }
   state.currentListaId = listaId;
   state.currentLista   = null;
+  itiState.defaultComputed = false;
+  itiState.defaultResult   = null;
+  // Hide any existing default banner
+  const existingBanner = document.getElementById("iti-default-banner");
+  if (existingBanner) existingBanner.remove();
 
   document.getElementById("lista-loading").classList.remove("hidden");
   document.getElementById("lista-empty").classList.add("hidden");
@@ -454,6 +459,11 @@ async function initListaView(listaId) {
     document.getElementById("lista-view-date").textContent  = formatDatePT(listaData.date);
     document.getElementById("lista-view-shop").textContent  = listaData.supermercado ? `🛍️ ${listaData.supermercado}` : "";
     renderLista(listaData);
+    // Compute default itinerary in background on first load
+    if (!itiState.defaultComputed) {
+      itiState.defaultComputed = true;
+      computeDefaultItinerary(listaData);
+    }
   });
 }
 
@@ -1197,9 +1207,12 @@ import { buildItinerary, formatDuration, formatDistance, renderMap } from "./iti
 
 // ── State ───────────────────────────────────────────
 const itiState = {
-  originLatLng: null,
-  result:       null,
-  mapRendered:  false,
+  originLatLng:     null,
+  result:           null,
+  mapRendered:      false,
+  defaultComputed:  false,
+  defaultResult:    null,
+  defaultMapRendered: false,
 };
 
 // ── Open modal ──────────────────────────────────────
@@ -1244,8 +1257,8 @@ document.querySelectorAll(".iti-origin-tab").forEach(tab => {
   });
 });
 
-// ── Get GPS location ─────────────────────────────────
-document.getElementById("btn-get-location").addEventListener("click", () => {
+// ── Get GPS location (iOS-safe: call getCurrentPosition synchronously in click handler)
+document.getElementById("btn-get-location").addEventListener("click", function() {
   const statusEl = document.getElementById("iti-gps-status");
   if (!navigator.geolocation) {
     statusEl.textContent = "⚠️ Geolocalização não suportada neste dispositivo.";
@@ -1254,17 +1267,23 @@ document.getElementById("btn-get-location").addEventListener("click", () => {
   }
   statusEl.textContent = "A obter localização…";
   statusEl.className   = "iti-status-line";
+  // Must call synchronously within the click event — no awaits before this on iOS Safari
   navigator.geolocation.getCurrentPosition(
-    pos => {
+    function(pos) {
       itiState.originLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      statusEl.textContent  = `✅ Localização obtida: ${itiState.originLatLng.lat.toFixed(4)}, ${itiState.originLatLng.lng.toFixed(4)}`;
+      statusEl.textContent  = "✅ " + itiState.originLatLng.lat.toFixed(4) + ", " + itiState.originLatLng.lng.toFixed(4);
       statusEl.className    = "iti-status-line success";
     },
-    err => {
-      statusEl.textContent = `⚠️ ${err.message}`;
+    function(err) {
+      let msg = err.message;
+      // iOS gives generic "User denied" — provide more helpful guidance
+      if (err.code === 1) msg = "Acesso negado. Active a localização em Definições > Safari > Localização.";
+      if (err.code === 2) msg = "Posição indisponível. Verifique se o GPS está activo.";
+      if (err.code === 3) msg = "Tempo esgotado. Tente novamente.";
+      statusEl.textContent = "⚠️ " + msg;
       statusEl.className   = "iti-status-line error";
     },
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
   );
 });
 
@@ -1900,3 +1919,164 @@ document.getElementById("btn-novo-shop-create").addEventListener("click", () =>
 document.getElementById("novo-shop-name").addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("btn-novo-shop-create").click(); }
 });
+
+
+
+// ═══════════════════════════════════════════════════
+// DEFAULT ITINERARY — auto-computed from suggested shop
+// ═══════════════════════════════════════════════════
+
+// Resolve origin coordinates from the suggested supermercado name
+// using the Places API (same as the itinerary module uses)
+const PLACES_KEY_DEFAULT = "AIzaSyBKLXfozJI7nvryAipKBV5o__2wX16afCI";
+const LUANDA_CENTRE_DEFAULT = { lat: -8.836, lng: 13.234 };
+
+async function resolveShopCoords(shopName) {
+  const url  = "https://places.googleapis.com/v1/places:searchText";
+  const body = {
+    textQuery:      `${shopName} Luanda Angola`,
+    languageCode:   "pt",
+    maxResultCount: 1,
+    locationBias: {
+      circle: {
+        center: { latitude: LUANDA_CENTRE_DEFAULT.lat, longitude: LUANDA_CENTRE_DEFAULT.lng },
+        radius: 30000,
+      },
+    },
+  };
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type":     "application/json",
+      "X-Goog-Api-Key":   PLACES_KEY_DEFAULT,
+      "X-Goog-FieldMask": "places.location,places.displayName",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) return null;
+  const data  = await resp.json();
+  const place = data.places?.[0];
+  if (!place) return null;
+  return { lat: place.location.latitude, lng: place.location.longitude };
+}
+
+async function computeDefaultItinerary(listaData) {
+  // Need at least 2 unique shops and a suggested supermercado
+  const shops = getShopsFromLista(listaData);
+  if (shops.length < 1) return; // nothing to route
+
+  const banner = createDefaultBanner("loading");
+  document.getElementById("lista-content").before(banner);
+
+  try {
+    // Determine origin: use the suggested supermercado if available, else Luanda centre
+    let origin = LUANDA_CENTRE_DEFAULT;
+    const suggestedShop = listaData.supermercado?.trim();
+
+    if (suggestedShop) {
+      const coords = await resolveShopCoords(suggestedShop);
+      if (coords) origin = coords;
+    }
+
+    // If only 1 shop and it IS the origin shop, nothing to route — skip
+    if (shops.length === 1 && suggestedShop &&
+        shops[0].nome.toLowerCase() === suggestedShop.toLowerCase()) {
+      banner.remove(); return;
+    }
+
+    const result = await buildItinerary({
+      shops,
+      origin,
+      returnToOrigin: false, // end at last shop, not back to start
+      onStatus: () => {},
+    });
+
+    itiState.defaultResult = result;
+    updateDefaultBanner(banner, result, suggestedShop || "Luanda");
+  } catch (e) {
+    console.warn("Default itinerary failed:", e.message);
+    banner.remove();
+  }
+}
+
+function createDefaultBanner(state) {
+  const el = document.createElement("div");
+  el.id = "iti-default-banner";
+  el.className = "iti-default-banner";
+
+  if (state === "loading") {
+    el.innerHTML = `
+      <div class="iti-default-banner-inner loading">
+        <div class="iti-default-spinner"></div>
+        <span class="iti-default-label">A calcular itinerário sugerido…</span>
+      </div>`;
+  }
+  return el;
+}
+
+function updateDefaultBanner(bannerEl, result, originLabel) {
+  const { formatDuration, formatDistance } = window._itiHelpers || {};
+  // Import helpers are module-scoped — use inline implementations
+  function fmtDur(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}min`:`${m} min`; }
+  function fmtDist(m) { return m>=1000?`${(m/1000).toFixed(1)} km`:`${m} m`; }
+
+  const stopsHtml = result.stops.map((s, i) => {
+    const shop = Object.values(state.supermercados).find(sh =>
+      sh.nome.toLowerCase() === s.shopName.toLowerCase()
+    );
+    const cor = shop?.cor || "#2D6A4F";
+    return `<span class="iti-def-stop" style="--stop-cor:${cor}">
+      <span class="iti-def-num" style="background:${cor}">${i+1}</span>${s.shopName}
+    </span>`;
+  }).join('<span class="iti-def-arrow">→</span>');
+
+  bannerEl.innerHTML = `
+    <div class="iti-default-banner-inner">
+      <div class="iti-def-top">
+        <span class="iti-def-title">🗺️ Itinerário sugerido</span>
+        <span class="iti-def-origin">a partir de <strong>${originLabel}</strong></span>
+        <div class="iti-def-stats">
+          <span>⏱ ${fmtDur(result.totalDuration)}</span>
+          <span>📍 ${fmtDist(result.totalDistance)}</span>
+          <span>🏪 ${result.stops.length} paragem${result.stops.length !== 1 ? "s" : ""}</span>
+        </div>
+      </div>
+      <div class="iti-def-stops">${stopsHtml}</div>
+      <div class="iti-def-actions">
+        <button id="btn-default-iti-map" class="iti-def-btn-map">Ver no mapa</button>
+        <button id="btn-default-iti-custom" class="iti-def-btn-custom">Personalizar</button>
+      </div>
+      <div id="iti-default-map-wrap" class="iti-default-map-wrap hidden">
+        <div id="iti-default-map" class="iti-default-map"></div>
+      </div>
+    </div>`;
+
+  // Wire buttons
+  document.getElementById("btn-default-iti-map").addEventListener("click", async () => {
+    const wrap = document.getElementById("iti-default-map-wrap");
+    const btn  = document.getElementById("btn-default-iti-map");
+    if (wrap.classList.contains("hidden")) {
+      wrap.classList.remove("hidden");
+      btn.textContent = "Ocultar mapa";
+      if (!itiState.defaultMapRendered) {
+        btn.textContent = "A carregar…";
+        try {
+          await renderMap("iti-default-map", itiState.defaultResult, state.supermercados);
+          itiState.defaultMapRendered = true;
+          btn.textContent = "Ocultar mapa";
+        } catch(e) { btn.textContent = "Erro"; }
+      }
+    } else {
+      wrap.classList.add("hidden");
+      btn.textContent = "Ver no mapa";
+    }
+  });
+
+  document.getElementById("btn-default-iti-custom").addEventListener("click", () => {
+    // Open the full itinerary modal pre-filled with the default origin
+    if (itiState.defaultResult) {
+      itiState.originLatLng = itiState.defaultResult.origin;
+    }
+    document.getElementById("btn-itinerario").click();
+  });
+}
